@@ -1,13 +1,11 @@
-import { StyleSheet, Text, View } from "react-native";
+import { View } from "react-native";
+
+import { CusText } from "@/components/ui";
 
 export function FeatureProfileSettings() {
   return (
-    <View style={styles.container}>
-      <Text>Settings</Text>
+    <View className="flex-1 items-center justify-center bg-background">
+      <CusText variant="heading">Settings</CusText>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center" },
-});

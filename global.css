@@ -1,3 +1,56 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+  Ranglar CSS o'zgaruvchilari sifatida saqlanadi (HEX ko'rinishida).
+  Qorong'u rejim: tizim temasi qorong'u bo'lsa, quyidagi qiymatlar avtomatik almashadi,
+  shuning uchun komponentlarda `dark:` yozish shart emas.
+*/
+:root {
+  --primary: #1E6FEB;
+  --primary-dark: #1558C0;
+  --primary-soft: #E8F0FE;
+  --background: #F4F6F9;
+  --surface: #FFFFFF;
+  --surface-alt: #F8FAFC;
+  --border: #E5E8EE;
+  --foreground: #1B2230;
+  --muted: #6B7385;
+  --subtle: #A3A9B7;
+  --success: #17A34A;
+  --success-soft: #E3F6EA;
+  --warning: #E58A00;
+  --warning-soft: #FFF1D6;
+  --danger: #E0342F;
+  --danger-soft: #FDE6E5;
+  --info: #1E6FEB;
+  --info-soft: #E1ECFD;
+  --neutral: #6B7385;
+  --neutral-soft: #EEF0F4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #4C8DF6;
+    --primary-dark: #2F73E0;
+    --primary-soft: #16284A;
+    --background: #0F141C;
+    --surface: #171D28;
+    --surface-alt: #1C2330;
+    --border: #2A3342;
+    --foreground: #E8ECF3;
+    --muted: #9AA3B5;
+    --subtle: #5F6B80;
+    --success: #3CC475;
+    --success-soft: #11301F;
+    --warning: #F5A524;
+    --warning-soft: #3A2A0A;
+    --danger: #F25C57;
+    --danger-soft: #3A1514;
+    --info: #4C8DF6;
+    --info-soft: #142548;
+    --neutral: #9AA3B5;
+    --neutral-soft: #232B39;
+  }
+}

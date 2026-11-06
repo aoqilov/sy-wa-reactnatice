@@ -1,81 +1,59 @@
 import "../../global.css";
 
-import { Tabs } from "expo-router";
+import { SplashScreen, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useColorScheme } from "nativewind";
+import { useEffect } from "react";
+import { View } from "react-native";
 
-const PINK = "#EC4899";
-const BLUE = "#1E63E9";
+import { ProfileProvider, useProfile } from "@/features/profile";
+import { loadSettings, useSettingsLoaded } from "@/shared/settings/settings";
 
-export default function RootLayout() {
-  const insets = useSafeAreaInsets();
+// Saqlangan profil va sozlamalar (til, o'lcham, mavzu) o'qilguncha splash ekran turadi
+// (aks holda bir lahza /login yoki eski mavzu yaltirab ketardi).
+SplashScreen.preventAutoHideAsync();
+
+function RootNavigator() {
+  const { profile, loading: profileLoading } = useProfile();
+  const settingsLoaded = useSettingsLoaded();
+  const hasProfile = profile !== null;
+  const ready = !profileLoading && settingsLoaded;
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    if (ready) SplashScreen.hide();
+  }, [ready]);
+
+  // Web'da splash yo'q, shuning uchun o'qish tugaguncha bo'sh fon ko'rsatamiz.
+  if (!ready) return <View className="flex-1 bg-background" />;
 
   return (
-    <View style={{ flex: 1 }}>
-      <StatusBar animated style="auto" />
-      {/* Faqat status bar balandligidagi pushti chiziq */}
-      {/* <View style={{ height: insets.top, backgroundColor: PINK }} /> */}
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: BLUE,
-            borderTopWidth: 2,
-            borderTopColor: PINK,
-            height: 70 + insets.bottom, // pastki safe area ham ichiga kiradi
-          },
-          tabBarActiveTintColor: "#fff",
-          tabBarInactiveTintColor: "rgba(255,255,255,0.6)",
-          tabBarLabelStyle: { fontWeight: "600" },
-        }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "Home",
-            tabBarIcon: ({ color }) => (
-              <Text style={{ color, fontSize: 20 }}>⌂</Text>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="search"
-          options={{
-            title: "Search",
-            tabBarIcon: ({ color }) => (
-              <Text style={{ color, fontSize: 20 }}>⌕</Text>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="news"
-          options={{
-            title: "News",
-            tabBarIcon: ({ color }) => (
-              <Text style={{ color, fontSize: 20 }}>▤</Text>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="reels"
-          options={{
-            title: "Reels",
-            tabBarIcon: ({ color }) => (
-              <Text style={{ color, fontSize: 20 }}>▶</Text>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: "Profile",
-            tabBarIcon: ({ color }) => (
-              <Text style={{ color, fontSize: 20 }}>☺</Text>
-            ),
-          }}
-        />
-      </Tabs>
-    </View>
+    <Stack screenOptions={{ headerShown: false }}>
+      {/* Profil bor — asosiy ilova. Profil o'chsa (Log out) foydalanuvchi o'zi /login'ga tushadi. */}
+      <Stack.Protected guard={hasProfile}>
+        <Stack.Screen name="(app)" />
+      </Stack.Protected>
+
+      {/* Profil yo'q — faqat /login. Saqlangach avtomatik asosiy ilovaga o'tadi. */}
+      <Stack.Protected guard={!hasProfile}>
+        <Stack.Screen name="login" />
+      </Stack.Protected>
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
+  const { colorScheme } = useColorScheme();
+
+  return (
+    <ProfileProvider>
+      <View className="flex-1 bg-background">
+        <StatusBar animated style={colorScheme === "dark" ? "light" : "dark"} />
+        <RootNavigator />
+      </View>
+    </ProfileProvider>
   );
 }

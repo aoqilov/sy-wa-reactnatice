@@ -1,21 +1,40 @@
 import { router } from "expo-router";
-import { Button, StyleSheet, Text, View } from "react-native";
+import { View } from "react-native";
+
+import { CusKeyboardScrollView, CusText } from "@/components/ui";
+import { useT } from "@/shared/i18n/use-t";
+
+import type { Profile } from "../api/profile-storage";
+import { ProfileForm } from "../components/profile-form";
+import { useProfile } from "../hooks/use-profile";
+import { profileToForm } from "../lib/profile-utils";
 
 export function EditProfileSheet() {
+  const t = useT();
+  const { profile, save } = useProfile();
+
+  const handleSubmit = async (next: Profile) => {
+    await save(next);
+    router.back();
+  };
+
   return (
-    <View style={styles.container}>
+    <CusKeyboardScrollView
+      containerClassName="flex-1 bg-surface"
+      contentContainerStyle={{ gap: 16, padding: 16, paddingBottom: 32 }}
+    >
       {/* Tepadagi "tayoqcha" (handle) */}
-      <View style={styles.handle} />
+      <View className="h-1.5 w-10 self-center rounded-full bg-border" />
 
-      <Text style={styles.title}>Edit profile</Text>
+      <CusText variant="heading" className="text-center">
+        {t("profile.edit")}
+      </CusText>
 
-      <Button title="Close" onPress={() => router.back()} />
-    </View>
+      <ProfileForm
+        initialValues={profile ? profileToForm(profile) : undefined}
+        submitLabel={t("form.save")}
+        onSubmit={handleSubmit}
+      />
+    </CusKeyboardScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 16, gap: 16, alignItems: "center" },
-  handle: { width: 40, height: 5, borderRadius: 3, backgroundColor: "#C7C7CC" },
-  title: { fontSize: 18, fontWeight: "700" },
-});
