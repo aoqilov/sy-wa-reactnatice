@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { CusCard, CusText } from "@/components/ui";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 
-import { Metric, MetricStatus } from "../api/get-metrics";
+import { EMPTY_VALUE, Metric, MetricStatus } from "../api/get-metrics";
 
 const TONE: Record<MetricStatus, "success" | "warning" | "danger"> = {
   normal: "success",
@@ -32,7 +32,7 @@ export function MeasureActions({ metric, onGuide, onHistory }: Props) {
         </CusText>
         <CusText
           variant="heading"
-          tone={TONE[metric.status]}
+          tone={metric.value === EMPTY_VALUE ? "muted" : TONE[metric.status]}
           numberOfLines={1}
           adjustsFontSizeToFit
         >

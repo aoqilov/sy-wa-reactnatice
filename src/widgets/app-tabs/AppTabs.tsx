@@ -95,8 +95,11 @@ export function AppTabs() {
         />
       ))}
 
-      {/* Watch sahifasi tab bar'da ko'rinmaydi, faqat yuqoridagi header bosilganda ochiladi */}
-      <Tabs.Screen name="watch" options={{ href: null }} />
+      {/* Watch sahifasi tab bar'da ko'rinmaydi, faqat yuqoridagi header bosilganda ochiladi.
+          `href: null` ISHLATILMAYDI: expo-router 58 da u `hidden: true` bo'ladi va yashirin tab ochilishi bilan
+          navigator bosh sahifaga qaytaradi ("redirects to its initial visible screen"). Shuning uchun faqat
+          tugmasini olib tashlaymiz, sahifaning o'zi oddiy tab bo'lib qoladi. */}
+      <Tabs.Screen name="watch" options={{ tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />
     </Tabs>
   );
 }

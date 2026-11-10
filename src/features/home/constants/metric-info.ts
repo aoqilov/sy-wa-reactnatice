@@ -70,12 +70,12 @@ export const METRIC_INFO: Record<MetricKey, MetricInfo> = {
   },
   blood: {
     about:
-      "Qon tarkibi — qondagi asosiy ko'rsatkichlar, masalan gemoglobin miqdori. U organizmning kislorod tashish qobiliyatini baholashga yordam beradi.",
-    how: "Soat optik datchik orqali qon tarkibini taxminiy baholaydi. Natija laboratoriya tahlilini almashtirmaydi.",
+      "Qon tahlili — beshta ko'rsatkich: siydik kislotasi, umumiy xolesterin, triglitseridlar, HDL (yaxshi xolesterin) va LDL (yomon xolesterin). Ular yurak-qon tomir va almashinuv holatini baholashga yordam beradi.",
+    how: "Soat optik datchik orqali beshala ko'rsatkichni bitta o'lchovda taxminiy baholaydi. Natija laboratoriya tahlilini almashtirmaydi.",
     tips: [
       "Natijani vaqt o'tishi bilan kuzating, bitta o'lchovga qarab xulosa qilmang.",
-      "Gemoglobin doimiy past yoki yuqori bo'lsa, shifokorga murojaat qiling.",
-      "Aniq tahlil uchun laboratoriyada qon topshiring.",
+      "Xolesterin yoki LDL doimiy yuqori, HDL past bo'lsa, shifokorga murojaat qiling.",
+      "Aniq tahlil uchun laboratoriyada och qoringa qon topshiring.",
     ],
   },
   sugar: {

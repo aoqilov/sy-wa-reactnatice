@@ -1,9 +1,14 @@
-// Soat holati. Hozircha soxta (mock) ma'lumot: keyin haqiqiy qurilmadan (Bluetooth/API) olinadi.
+import { useWatchConnection } from "@/shared/watch/watch-connection";
+
+// Headerdagi soat holati: haqiqiy Bluetooth ulanishidan (shared/watch/watch-connection).
 export type WatchStatus = {
-  model: string;
-  battery: number; // 0-100
+  connected: boolean;
+  connecting: boolean;
+  model: string | null;
+  battery: number | null; // 0-100, noma'lum bo'lsa null
 };
 
 export function useWatchStatus(): WatchStatus {
-  return { model: "Watch X1", battery: 82 };
+  const { status, model, battery } = useWatchConnection();
+  return { connected: status === "ready", connecting: status === "connecting", model, battery };
 }

@@ -31,7 +31,7 @@ export const METRIC_GUIDE: Record<MetricKey, MetricGuide> = {
   pressurePump: {
     steps: [
       "Orqangizni suyab o'tiring, oyoqlarni kesishtirmang.",
-      "Soatni bilakka taqing, qo'lni yurak balandligida tuting.",
+      "Soatni bilakka taqing. Tirsakni stolga tirab, bilakni gorizontal va soatni yurak balandligida tuting: soat qo'l holatini ichidagi harakat datchigi bilan tekshiradi.",
       "\"Boshlash\" ni bosing, nasos bilakni havo bilan siqadi.",
       "Gaplashmang va qimirlamang, natija chiqquncha kuting.",
     ],
@@ -97,8 +97,8 @@ export const METRIC_GUIDE: Record<MetricKey, MetricGuide> = {
     steps: [
       "Stulda o'tiring, qo'llaringizni stolga qo'ying va bo'shashtiring.",
       "Qo'l quruq va toza bo'lsin.",
-      "\"Boshlash\" ni bosib, barmog'ingizni soat datchigiga qo'ying.",
-      "30 soniya qimirlamay va gaplashmay turing.",
+      "Soatni bilakka zich taqing. \"Boshlash\" ni bosib, boshqa qo'lingiz barmog'ini soatning metall qismiga (elektrodga) tegizing.",
+      "Natija chiqquncha barmoqni ko'tarmang, qimirlamang va gaplashmang.",
     ],
     standard: {
       name: "Yurak ritmi bo'yicha umumiy tasnif (mock)",
@@ -117,11 +117,13 @@ export const METRIC_GUIDE: Record<MetricKey, MetricGuide> = {
       "Natijani vaqt bo'yicha kuzating, aniq tahlil uchun laboratoriyaga boring.",
     ],
     standard: {
-      name: "Gemoglobin bo'yicha umumiy mezon (mock)",
+      name: "Kattalar uchun umumiy me'yorlar",
       ranges: [
-        { label: "Past", range: "120 g/l dan kam", tone: "warning" },
-        { label: "Normal", range: "120–170 g/l", tone: "success" },
-        { label: "Yuqori", range: "170 g/l dan ko'p", tone: "warning" },
+        { label: "Umumiy xolesterin", range: "5.2 mmol/l dan kam", tone: "success" },
+        { label: "Triglitseridlar", range: "1.7 mmol/l dan kam", tone: "success" },
+        { label: "HDL", range: "1.0 mmol/l dan ko'p", tone: "success" },
+        { label: "LDL", range: "3.4 mmol/l dan kam", tone: "success" },
+        { label: "Siydik kislotasi", range: "150–420 µmol/l", tone: "success" },
       ],
     },
   },

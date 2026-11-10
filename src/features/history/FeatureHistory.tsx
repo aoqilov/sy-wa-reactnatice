@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { CusScrollView } from "@/components/ui";
+import { EcgRecordsSheet } from "@/features/ecg";
 import type { MetricKey } from "@/features/home/api/get-metrics";
 
 import { HistoryCard } from "./components/history-card";
@@ -18,6 +19,8 @@ export function FeatureHistory({ focusKey }: { focusKey?: MetricKey }) {
   // Tafsilot sheet'i: qaysi o'lchov ekani va ochiq-yopiqligi alohida saqlanadi (yopilish animatsiyasi uchun).
   const [detailKey, setDetailKey] = useState<MetricKey | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  // EKG: haqiqiy saqlangan yozuvlar va ularning hisoboti (to'lqin bilan).
+  const [ecgOpen, setEcgOpen] = useState(false);
 
   const ordered = focusKey
     ? [...summaries].sort((a, b) => Number(b.meta.key === focusKey) - Number(a.meta.key === focusKey))
@@ -41,6 +44,10 @@ export function FeatureHistory({ focusKey }: { focusKey?: MetricKey }) {
               summary={s}
               highlighted={s.meta.key === focusKey}
               onPress={() => {
+                if (s.meta.key === "ecg") {
+                  setEcgOpen(true);
+                  return;
+                }
                 setDetailKey(s.meta.key);
                 setDetailOpen(true);
               }}
@@ -58,6 +65,8 @@ export function FeatureHistory({ focusKey }: { focusKey?: MetricKey }) {
           onClose={() => setDetailOpen(false)}
         />
       ) : null}
+
+      <EcgRecordsSheet visible={ecgOpen} onClose={() => setEcgOpen(false)} />
     </View>
   );
 }

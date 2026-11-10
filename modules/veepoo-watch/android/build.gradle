@@ -1,0 +1,44 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.veepoowatch'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.veepoowatch"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+// Veepoo SDK AAR'lari expo-module.config.json ichidagi `gradleAarProjects` orqali Gradle loyihasi
+// sifatida ulanadi. Loyiha nomi `<modul-nomi>$<aar-nomi>`: `$` — literal ajratuvchi (Groovy
+// interpolyatsiyasi emas), shuning uchun satrlar birlashtiriladi.
+// SDK versiyalari repoga pin qilingan: vpprotocol 2.3.95.15, vpbluetooth 1.20 (docs/watch-integration-plan.md).
+dependencies {
+  implementation project(':' + project.name + '$vpprotocol')
+  implementation project(':' + project.name + '$vpbluetooth')
+  implementation project(':' + project.name + '$jl-watch')
+  implementation project(':' + project.name + '$jl-rcsp')
+  implementation project(':' + project.name + '$jl-bt-ota')
+  implementation project(':' + project.name + '$bmp-convert')
+  implementation project(':' + project.name + '$abpartool')
+
+  // Goodix protokol kutubxonasi (SDK hujjatida ixtiyoriy). .jar fayllar kutubxona modulida to'g'ridan-to'g'ri ishlaydi.
+  implementation files('libs/libcomx-0.5.jar')
+
+  // SDK hujjati talab qiladi: Nordic (DFU/skan) va LocalBroadcastManager. Demo loyihada "majburiy" deb belgilangan.
+  implementation 'no.nordicsemi.android:mcumgr-core:2.7.4'
+  implementation 'no.nordicsemi.android:mcumgr-ble:2.7.4'
+  implementation 'no.nordicsemi.android.support.v18:scanner:1.4.2'
+  implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
+
+  // SDK ichidagi gson-2.2.4.jar o'rniga Maven'dagi gson: boshqa kutubxonalar bilan "Duplicate class" bo'lmasligi uchun.
+  implementation 'com.google.code.gson:gson:2.10.1'
+}

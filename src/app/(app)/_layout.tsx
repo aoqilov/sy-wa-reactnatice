@@ -3,8 +3,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppHeader } from "@/widgets/app-header/AppHeader";
 import { AppTabs } from "@/widgets/app-tabs/AppTabs";
+import { WatchGate } from "@/widgets/watch-gate/WatchGate";
 
 // Asosiy ilova (header + tab bar). Faqat profil to'ldirilgandan keyin ochiladi — root layout himoyalaydi.
+// Soat ulanmaguncha hammasini WatchGate (to'liq ekranli "Soatni ulang") to'sib turadi.
 export default function AppLayout() {
   const insets = useSafeAreaInsets();
 
@@ -19,6 +21,9 @@ export default function AppLayout() {
         className="absolute inset-x-0 bottom-0 border-t border-border bg-surface"
         style={{ height: insets.bottom }}
       />
+
+      {/* Eng oxirgi bola: hamma narsa (header, tab bar, pastki chiziq) ustida turadi */}
+      <WatchGate />
     </View>
   );
 }
