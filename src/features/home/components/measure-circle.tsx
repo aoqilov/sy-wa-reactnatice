@@ -15,7 +15,13 @@ import Svg, { Circle } from "react-native-svg";
 import { CusButton, CusText } from "@/components/ui";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 
-import { Metric } from "../api/get-metrics";
+import { EMPTY_VALUE, Metric, MetricStatus } from "../api/get-metrics";
+
+const TONE: Record<MetricStatus, "success" | "warning" | "danger"> = {
+  normal: "success",
+  warning: "warning",
+  danger: "danger",
+};
 
 type Props = {
   metric: Metric;
@@ -56,6 +62,7 @@ export function MeasureCircle({ metric, measuring, progress, display, onStart, o
   const visible = useSharedValue(0); // mil ko'rinishi
 
   const indeterminate = measuring && progress <= 0;
+  const measured = metric.value !== EMPTY_VALUE; // oxirgi o'lchov bor: qiymat holat rangida
 
   useEffect(() => {
     if (measuring) {
@@ -137,6 +144,7 @@ export function MeasureCircle({ metric, measuring, progress, display, onStart, o
         <>
           <CusText
             className="font-bold"
+            tone={measured ? TONE[metric.status] : "default"}
             style={NUMBER_STYLE}
             numberOfLines={1}
             adjustsFontSizeToFit
@@ -146,6 +154,10 @@ export function MeasureCircle({ metric, measuring, progress, display, onStart, o
           </CusText>
           <CusText variant="caption" tone="muted">
             {metric.unit}
+          </CusText>
+          {/* Oxirgi o'lchov: qachon o'lchangani (avval doira ostidagi alohida kartada edi) */}
+          <CusText variant="caption" tone="muted" className="px-8 text-center" numberOfLines={1}>
+            {measured ? `Oxirgi o'lchov: ${metric.updatedAt}` : metric.updatedAt}
           </CusText>
           <CusButton
             title="Boshlash"

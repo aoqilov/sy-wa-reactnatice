@@ -71,6 +71,12 @@ const DEFS: Def[] = [
 
 export const BLOOD_PART_COUNT = DEFS.length;
 
+/** Bitta ko'rsatkich qiymati, natija kartasidagi aniqlikda ("256.5", "3.35"). */
+export function formatBlood(key: BloodPartKey, v: number): string {
+  const d = DEFS.find((x) => x.key === key);
+  return v.toFixed(d ? d.decimals : 2);
+}
+
 export function bloodRows(parts: BloodParts): BloodRow[] {
   return DEFS.map((d) => {
     const v = parts[d.key];

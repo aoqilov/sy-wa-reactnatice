@@ -9,7 +9,6 @@ export type MetricStatus = "normal" | "warning" | "danger";
 export type MetricKey =
   | "pulse"
   | "pressurePump"
-  | "pressureOptical"
   | "oxygen"
   | "temperature"
   | "ecg"
@@ -42,7 +41,6 @@ type MetricInfo = Pick<Metric, "key" | "title" | "icon" | "unit" | "normalRange"
 const METRICS: MetricInfo[] = [
   { key: "pulse", title: "Puls", icon: "pulse", unit: "zarb/daq", normalRange: "60-100 zarb/daq" },
   { key: "pressurePump", title: "Bosim (nasos)", icon: "meter", unit: "mmHg", normalRange: "120/80 mmHg gacha" },
-  { key: "pressureOptical", title: "Bosim (optik)", icon: "eye", unit: "mmHg", normalRange: "120/80 mmHg gacha" },
   { key: "oxygen", title: "Kislorod", icon: "heart", unit: "% SpO2", normalRange: "95-100 %" },
   { key: "temperature", title: "Temperatura", icon: "flame", unit: "°C", normalRange: "36.1-37.2 °C" },
   // Qiymat — EKG o'lchovidagi puls; HRV va QTc tafsilotlarda (lib/readings.ts).

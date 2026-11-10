@@ -92,8 +92,6 @@ class VeepooWatchModule : Module() {
     Function("stopHeart") { controller().stopHeart() }
     Function("startSpo2") { controller().startSpo2() }
     Function("stopSpo2") { controller().stopSpo2() }
-    Function("startBp") { controller().startBp() }
-    Function("stopBp") { controller().stopBp() }
     Function("startEcg") { controller().startEcg() }
     Function("stopEcg") { controller().stopEcg() }
     Function("startTemp") { controller().startTemp() }
@@ -105,6 +103,16 @@ class VeepooWatchModule : Module() {
     Function("startCuffBp") { rawFlag: Boolean -> controller().startCuffBp(rawFlag) }
     Function("stopCuffBp") { controller().stopCuffBp() }
     Function("readManualBp") { sinceSec: Int -> controller().readManualBp(sinceSec) }
+    Function("readManualData") { sinceSec: Int, kinds: List<String> -> controller().readManualData(sinceSec, kinds) }
+    Function("readDailyData") { days: Int -> controller().readDailyData(days) }
+
+    // Soatdagi eslatmalar (matnli budilnik)
+    Function("readTextAlarms") { controller().readTextAlarms() }
+    Function("addTextAlarm") { hour: Int, minute: Int, repeat: String, content: String ->
+      controller().addTextAlarm(hour, minute, repeat, content)
+    }
+    Function("deleteTextAlarm") { id: Int -> controller().deleteTextAlarm(id) }
+    Function("setTextAlarmOpen") { id: Int, open: Boolean -> controller().setTextAlarmOpen(id, open) }
 
     // Bildirishnoma
     Function("readNotificationSwitches") { controller().readNotificationSwitches() }

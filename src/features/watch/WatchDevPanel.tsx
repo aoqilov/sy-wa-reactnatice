@@ -111,8 +111,6 @@ function WatchDevPanelInner({ watch }: { watch: WatchModule }) {
         <CusButton title="Puls ■" size="sm" variant="outline" disabled={!ready} onPress={() => run("stopHeart", () => VeepooWatch.stopHeart())} />
         <CusButton title="SpO₂ ▶" size="sm" disabled={!ready} onPress={() => run("startSpo2", () => VeepooWatch.startSpo2())} />
         <CusButton title="SpO₂ ■" size="sm" variant="outline" disabled={!ready} onPress={() => run("stopSpo2", () => VeepooWatch.stopSpo2())} />
-        <CusButton title="Bosim (optik) ▶" size="sm" disabled={!ready} onPress={() => run("startBp", () => VeepooWatch.startBp())} />
-        <CusButton title="Bosim (optik) ■" size="sm" variant="outline" disabled={!ready} onPress={() => run("stopBp", () => VeepooWatch.stopBp())} />
         <CusButton title="EKG ▶" size="sm" disabled={!ready} onPress={() => run("startEcg", () => VeepooWatch.startEcg())} />
         <CusButton title="EKG ■" size="sm" variant="outline" disabled={!ready} onPress={() => run("stopEcg", () => VeepooWatch.stopEcg())} />
         <CusButton

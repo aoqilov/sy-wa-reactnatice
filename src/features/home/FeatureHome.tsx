@@ -1,14 +1,16 @@
+import Octicons from "@expo/vector-icons/Octicons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { CusButton, CusScrollView, CusText } from "@/components/ui";
 import { EcgLiveStrip } from "@/features/ecg";
 import { useT } from "@/shared/i18n/use-t";
+import { useThemeColor } from "@/shared/theme/use-theme-color";
+import { useTabBarSpace } from "@/widgets/app-tabs/AppTabs";
 
 import { Metric } from "./api/get-metrics";
 import { BloodResult } from "./components/blood-result";
-import { MeasureActions } from "./components/measure-actions";
 import { MeasureCircle } from "./components/measure-circle";
 import { MetricSelector } from "./components/metric-selector";
 import { useMeasurement } from "./hooks/use-measurement";
@@ -46,10 +48,11 @@ function HomeContent({
     hint,
     error,
     start,
-    startOnWatch,
     cancel,
   } = useMeasurement(metrics);
   const t = useT();
+  const primary = useThemeColor("primary", "#1E6FEB");
+  const tabBarSpace = useTabBarSpace();
   const [guideOpen, setGuideOpen] = useState(false); // "Qanday o'lchanadi?" sheet'i
 
   // Info sheet: qaysi o'lchov haqida ekani va ochiq-yopiqligi alohida saqlanadi,
@@ -62,6 +65,17 @@ function HomeContent({
     <View className="flex-1 bg-background">
       {/* Tepa qism qimirlamaydi: scroll paytida doira yopilib qolmaydi */}
       <View className="items-center gap-5 pb-5 pt-6">
+        {/* "Qanday o'lchanadi?" — chap yuqori burchakda */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Qanday o'lchanadi?"
+          onPress={() => setGuideOpen(true)}
+          hitSlop={8}
+          className="absolute left-4 top-3 z-10 h-11 w-11 items-center justify-center rounded-full border border-border bg-surface"
+        >
+          <Octicons name="question" size={22} color={primary} />
+        </Pressable>
+
         {/* 1. O'lchash */}
         <MeasureCircle
           metric={current}
@@ -72,16 +86,6 @@ function HomeContent({
           onCancel={cancel}
         />
 
-        {/* Nasosli bosim: ilovadan boshlash soatda ishlamasa, soatning o'zida o'lchab natijani olish mumkin */}
-        {current.key === "pressurePump" && !measuring ? (
-          <CusButton
-            title={t("measure.onWatch.action")}
-            variant="ghost"
-            size="sm"
-            onPress={startOnWatch}
-          />
-        ) : null}
-
         {/* EKG: o'lchash paytida jonli to'lqin; boshqa paytda saqlangan yozuvlar History sahifasida (hisoboti bilan) */}
         {current.key === "ecg" && measuring ? <EcgLiveStrip /> : null}
         {current.key === "ecg" && !measuring ? (
@@ -89,7 +93,9 @@ function HomeContent({
             title={t("ecg.records")}
             variant="ghost"
             size="sm"
-            onPress={() => router.push({ pathname: "/history", params: { metric: "ecg" } })}
+            onPress={() =>
+              router.push({ pathname: "/history/[metric]", params: { metric: "ecg" } }, { withAnchor: true })
+            }
           />
         ) : null}
 
@@ -111,38 +117,40 @@ function HomeContent({
           </CusText>
         ) : null}
 
-        {/* 2. Oxirgi o'lchov | Qanday o'lchanadi? | Tarix */}
-        <MeasureActions
-          metric={current}
-          onGuide={() => setGuideOpen(true)}
-          onHistory={() =>
-            router.push({
-              pathname: "/history",
-              params: { metric: current.key },
-            })
-          }
-        />
       </View>
 
-      {/* 3. Faqat o'lchov kartalari scroll bo'ladi (kerak bo'lsagina) */}
-      <CusScrollView contentContainerClassName="pb-20">
-        {/* Qon tahlili: beshta ko'rsatkich (lipidlar, siydik kislotasi) hammasi bitta kartada */}
-        {current.key === "blood" && current.blood && !measuring ? (
-          <View className="px-4 pb-4">
-            <BloodResult rows={current.blood} updatedAt={current.updatedAt} />
-          </View>
-        ) : null}
+      {/* 3. O'lchovlar paneli: sarlavha qotib turadi, faqat kartalar scroll bo'ladi (kerak bo'lsagina).
+          Pastda suzuvchi tab bar balandligicha joy. */}
+      <View
+        className="flex-1 border-t border-border bg-surface"
+        style={{ borderTopStartRadius: 12, borderTopEndRadius: 12 }}
+      >
+        <View className="gap-1 px-4 pb-2 pt-4">
+          <CusText variant="heading">O&apos;lchovni tanlang</CusText>
+          <CusText variant="caption" tone="muted">
+            Kerakli ko&apos;rsatkichni tanlab, yuqoridagi &quot;Boshlash&quot; tugmasini bosing.
+          </CusText>
+        </View>
 
-        <MetricSelector
-          metrics={items}
-          selectedKey={selectedKey}
-          onSelect={select}
-          onInfo={(key) => {
-            setInfoKey(key);
-            setInfoOpen(true);
-          }}
-        />
-      </CusScrollView>
+        <CusScrollView className="flex-1" contentContainerStyle={{ paddingBottom: tabBarSpace }}>
+          {/* Qon tahlili: beshta ko'rsatkich (lipidlar, siydik kislotasi) hammasi bitta kartada */}
+          {current.key === "blood" && current.blood && !measuring ? (
+            <View className="px-4 pt-2">
+              <BloodResult rows={current.blood} updatedAt={current.updatedAt} />
+            </View>
+          ) : null}
+
+          <MetricSelector
+            metrics={items}
+            selectedKey={selectedKey}
+            onSelect={select}
+            onInfo={(key) => {
+              setInfoKey(key);
+              setInfoOpen(true);
+            }}
+          />
+        </CusScrollView>
+      </View>
 
       <MetricInfoSheet
         metric={infoMetric}

@@ -44,22 +44,6 @@ export const METRIC_GUIDE: Record<MetricKey, MetricGuide> = {
       ],
     },
   },
-  pressureOptical: {
-    steps: [
-      "Qulay o'tiring va 5 daqiqa dam oling.",
-      "Soat teriga zich tegib tursin, qo'l harakatsiz bo'lsin.",
-      "\"Boshlash\" ni bosing, soat yorug'lik bilan o'lchaydi.",
-      "Natija taxminiy: muhim qaror uchun nasosli usulni tanlang.",
-    ],
-    standard: {
-      name: "Qon bosimi bo'yicha umumiy tavsiyalar (mock)",
-      ranges: [
-        { label: "Normal", range: "120/80 dan kam", tone: "success" },
-        { label: "Yuqori-normal", range: "120–139 / 80–89", tone: "warning" },
-        { label: "Yuqori", range: "140/90 dan ko'p", tone: "danger" },
-      ],
-    },
-  },
   oxygen: {
     steps: [
       "Qo'lingiz iliq va quruq bo'lsin, lak surtilgan tirnoqdan saqlaning.",

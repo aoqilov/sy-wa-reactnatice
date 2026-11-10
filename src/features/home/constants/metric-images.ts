@@ -5,7 +5,6 @@ import type { MetricKey } from "../api/get-metrics";
 export const METRIC_IMAGES: Record<MetricKey, number> = {
   pulse: require("../../../../assets/images/metrics/pulse.jpg"),
   pressurePump: require("../../../../assets/images/metrics/pressurePump.jpg"),
-  pressureOptical: require("../../../../assets/images/metrics/pressureOptical.jpg"),
   oxygen: require("../../../../assets/images/metrics/oxygen.jpg"),
   temperature: require("../../../../assets/images/metrics/temperature.jpg"),
   ecg: require("../../../../assets/images/metrics/ecg.jpg"),

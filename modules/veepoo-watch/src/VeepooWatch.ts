@@ -20,8 +20,6 @@ declare class VeepooWatchModule extends NativeModule<VeepooWatchEvents> {
   startSpo2(): void;
   stopSpo2(): void;
   /** Optik qon bosimi (umumiy rejim). */
-  startBp(): void;
-  stopBp(): void;
   /** EKG: hodisalar "ecg" (soniyada holat), "ecgResult" (natija), "ecgWave" (to'lqin nuqtalari soni). */
   startEcg(): void;
   stopEcg(): void;
@@ -43,6 +41,23 @@ declare class VeepooWatchModule extends NativeModule<VeepooWatchEvents> {
   stopCuffBp(): void;
   /** Soatning o'zida o'lchangan bosim yozuvlarini o'qish: natija "manualBp" hodisasi bilan keladi. `sinceSec` — epoch soniya. */
   readManualBp(sinceSec: number): void;
+  /**
+   * History sinxroni: soat xotirasidagi yozuvlar. `kinds`: "bp" | "hr" | "spo2" | "temp" | "glucose" | "blood".
+   * Hodisa "manualData": `{kind, records}` har tur uchun, oxirida `{complete}` yoki `{failed}`.
+   */
+  readManualData(sinceSec: number, kinds: string[]): void;
+  /**
+   * Soatning kunlik 5 daqiqalik ma'lumoti (avto-o'lchovlar), bugundan `days` kun. Hodisa "dailyData":
+   * `{records}` (har yozuv: y, mo, d, h, mi va hr / hrs / sys / dia / temp / spo2 / glucose / blood), oxirida
+   * `{complete}` yoki `{timeout}`.
+   */
+  readDailyData(days: number): void;
+  /** Soatdagi matnli budilniklar. Hodisa "textAlarm": `{op, alarms: [{id, hour, minute, repeat, content, open}]}`. */
+  readTextAlarms(): void;
+  /** `repeat`: 7 belgi, masalan "1111111" (har kuni). */
+  addTextAlarm(hour: number, minute: number, repeat: string, content: string): void;
+  deleteTextAlarm(id: number): void;
+  setTextAlarmOpen(id: number, open: boolean): void;
 
   readNotificationSwitches(): void;
   setOtherNotifications(on: boolean): void;

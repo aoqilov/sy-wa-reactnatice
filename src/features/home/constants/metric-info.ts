@@ -28,16 +28,6 @@ export const METRIC_INFO: Record<MetricKey, MetricInfo> = {
       "O'lchash vaqtida gaplashmang va harakatlanmang.",
     ],
   },
-  pressureOptical: {
-    about:
-      "Optik usulda qon bosimi manjetsiz, yorug'lik datchigi yordamida taxminiy hisoblanadi. U tez va qulay, lekin nasosli usuldan kamroq aniq.",
-    how: "Soat bilakdagi qon oqimi to'lqinini yorug'lik bilan o'qib, bosimni hisoblaydi. Natija tonometr o'rnini bosmaydi.",
-    tips: [
-      "Tez kuzatuv uchun ishlating, muhim qaror uchun nasosli usulni tanlang.",
-      "Soat terini zich ushlab tursin va qo'l harakatsiz bo'lsin.",
-      "Natijalar bir-biridan keskin farq qilsa, qayta o'lchang.",
-    ],
-  },
   oxygen: {
     about:
       "Kislorod (SpO2) — qondagi gemoglobin qanchasi kislorod bilan to'yinganini ko'rsatadi. Sog'lom odamda odatda 95–100 %.",

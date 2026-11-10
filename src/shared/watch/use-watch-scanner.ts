@@ -118,5 +118,22 @@ export function useWatchScanner() {
     }
   }, []);
 
-  return { devices, scanning, searched, problem, start, stop, connect, cancelConnect, enableBluetooth };
+  /**
+   * "Qaytadan urinish": soat bilan Bluetooth aloqasini uzadi (osilib qolgan ulanish yoki SDK sessiyasi bo'shaydi) va
+   * sahifani boshlang'ich holatga qaytaradi — skan to'xtaydi, topilganlar ro'yxati va xatolar tozalanadi.
+   */
+  const retry = useCallback(() => {
+    stop();
+    setScanning(false);
+    setDevices([]);
+    setSearched(false);
+    setProblem(null);
+    try {
+      watchModule?.disconnect();
+    } catch {
+      // Aloqa allaqachon yo'q: tozalash yetarli.
+    }
+  }, [stop]);
+
+  return { devices, scanning, searched, problem, start, stop, connect, cancelConnect, enableBluetooth, retry };
 }

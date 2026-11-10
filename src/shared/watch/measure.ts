@@ -1,7 +1,6 @@
 import watchModule, { type WatchEvent } from "../../../modules/veepoo-watch";
 import { saveEcgDebug } from "./ecg-debug";
 import { EcgTrace, setLiveEcg } from "./ecg-trace";
-import { getWatchConnection } from "./watch-connection";
 
 // Soatda qo'lda o'lchash: ilova soatga so'rov yuboradi (native modul), soat qiymatlarni oqim bilan qaytaradi.
 // Taymerlar, chegaralar va xato mantig'i `synapse-soat/src/watch/session.ts` dan ko'chirilgan (haqiqiy soat
@@ -10,7 +9,6 @@ import { getWatchConnection } from "./watch-connection";
 export type MeasureKey =
   | "pulse"
   | "pressurePump"
-  | "pressureOptical"
   | "oxygen"
   | "temperature"
   | "ecg"
@@ -20,7 +18,6 @@ export type MeasureKey =
 const MEASURABLE: readonly string[] = [
   "pulse",
   "pressurePump",
-  "pressureOptical",
   "oxygen",
   "temperature",
   "ecg",
@@ -39,7 +36,7 @@ export type RawReading =
   | { key: "sugar"; value: number; risk?: GlucoseRisk }
   /** Qon tahlili (optik, taxminiy): beshta qiymat birga. */
   | { key: "blood"; parts: BloodParts }
-  | { key: "pressurePump" | "pressureOptical"; sys: number; dia: number; pulse?: number }
+  | { key: "pressurePump"; sys: number; dia: number; pulse?: number }
   /** EKG: `value` — o'rtacha puls; qolganlari soat bergan bo'lsa. `trace` — to'lqin (mV, 0.5 Hz filtrlangan). */
   | {
       key: "ecg";
@@ -90,8 +87,6 @@ export type MeasureError =
   | "glucoseUnsupported"
   | "glucoseNoData"
   | "bloodUnsupported"
-  | "bpOpticalUnsupported"
-  | "bpOpticalNoReply"
   | "bloodNoData";
 
 /** O'lchash davom etayotganda foydalanuvchiga ko'rsatiladigan ogohlantirish (xato emas). Tarjima kaliti: `measure.hint.<kod>` */
@@ -113,13 +108,6 @@ export type MeasureHandlers = {
 
 const HR_MS = 30_000;
 const SPO2_MS = 30_000;
-// Optik bosim: soat paket yubormay qo'ysa (shuncha vaqt) yoki umumiy chegara o'tsa — xato. Avval qat'iy 80 s edi:
-// sekinroq yakunlaydigan soatda o'lchov oxiriga yetmay uzilardi.
-const BP_IDLE_MS = 20_000;
-const BP_MAX_MS = 150_000;
-const BP_RESULT_GRACE_MS = 5_000; // progress 100% bo'lib qiymat yo'q bo'lsa, keyingi paketni kutish
-const BP_WEAR_GRACE_MS = 10_000; // "taqilmagan" holati shuncha davom etsagina xato (o'tish paketlari bo'ladi)
-const BP_NO_PROGRESS_MS = 55_000; // progress bermaydigan soat 55 s dan keyin natija beradi (SDK hujjati)
 const CUFF_REPLY_MS = 12_000; // soat yostiqchani to'ldirishdan oldin ekranida 3 s sanaydi
 const CUFF_IDLE_MS = 30_000;
 const CUFF_MAX_MS = 180_000;
@@ -194,6 +182,10 @@ function positive(v: unknown): number | undefined {
 
 const noop = () => {};
 
+/** Hozir soatda o'lchov ketyaptimi: History sinxroni shu paytda soatga so'rov yubormaydi (soat bir ishni bajaradi). */
+let activeMeasures = 0;
+export const isMeasuring = () => activeMeasures > 0;
+
 /** O'lchashni boshlaydi. Qaytgan funksiya o'lchashni bekor qiladi (soatga to'xtatish buyrug'i yuboriladi). */
 export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => void {
   const watch = watchModule;
@@ -204,6 +196,7 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
 
   const startedAt = Date.now();
   let over = false;
+  activeMeasures += 1;
   let stopNative: () => void = noop;
   // `synapse-soat` andozasi: soat o'zi yakunlaydigan o'lchovlarda (bosim, harorat) muvaffaqiyatdan keyin to'xtatish
   // buyrug'i yuborilmaydi, faqat xato yoki bekor qilishda. Oqim bilan ketadigan o'lchovlarda (puls, SpO2) esa har doim.
@@ -230,6 +223,7 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
   };
 
   const teardown = (sendStop: boolean) => {
+    if (!over) activeMeasures -= 1;
     over = true;
     subscriptions.forEach((s) => s.remove());
     timers.forEach(clearTimeout);
@@ -332,68 +326,6 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
         if (samples.length === 0) return fail("noData");
         done({ key, value: median(samples.slice(-SAMPLES_USED)) });
       }, 250);
-      break;
-    }
-
-    case "pressureOptical": {
-      // Soat o'zi yakunlaydi (progress 0..100). Qo'l holati optik o'lchovda SDK holatlarida yo'q: soat faqat band,
-      // zaryad, batareya va "taqilmagan" (WEAR_OFF) deydi. WEAR_OFF qo'lni joylashtirish paytida qisqa keladi, shuning
-      // uchun faqat BP_WEAR_GRACE_MS davom etsagina xato; o'lchovni soat o'zi davom ettirsa, biz ham kutamiz.
-      let busy = 0;
-      let wearSince: number | null = null;
-      let haveProgress = false;
-      let idle: ReturnType<typeof setTimeout> | undefined;
-      let grace: ReturnType<typeof setTimeout> | undefined;
-      let last: { sys: number; dia: number } | undefined;
-      let answered = false; // soatdan kamida bitta paket keldi
-      const finish = () => (last ? done({ key, ...last }) : fail("bpFailed"));
-      const touch = () => {
-        cancelLater(idle);
-        // Hech javob bo'lmasa — buyruq soatga yetmagan yoki soat optik o'lchovni bilmaydi (SDK `isSupportBp` false
-        // bo'lsa buyruqni jimgina yubormaydi). Bu "yakunlay olmadi" emas: alohida, aniq xabar.
-        idle = later(() => fail(answered ? "bpFailed" : "bpOpticalNoReply"), BP_IDLE_MS);
-      };
-      // Soat ulanganda "optik bosim yo'q" degan bo'lsa (features.bloodPressure), 20 s kutib o'tirmaymiz.
-      if (getWatchConnection().info.features.bloodPressure === "UNSUPPORT") {
-        startNative = () => fail("bpOpticalUnsupported");
-        break;
-      }
-      startNative = () => watch.startBp();
-      stopNative = () => watch.stopBp();
-      onEvent = (e) => {
-        if (e.type !== "bp") return;
-        // Native qism (yangi build): SDK'da optik bosim yo'q — buyruq yuborilmadi.
-        if (e.unsupported === true) return fail("bpOpticalUnsupported");
-        answered = true;
-        touch();
-        if (e.status === "STATE_BP_LOW_BATTERY") return fail("lowBattery");
-        if (e.status === "STATE_BP_CHARGING") return fail("charging");
-        busy = e.status === "STATE_BP_BUSY" ? busy + 1 : 0;
-        if (busy >= 3) return fail("busy");
-        if (e.status === "STATE_BP_WEAR_OFF") {
-          wearSince ??= Date.now();
-          if (Date.now() - wearSince > BP_WEAR_GRACE_MS) return fail("notWorn");
-        } else {
-          wearSince = null;
-        }
-
-        haveProgress = haveProgress || e.haveProgress === true;
-        const percent = typeof e.progress === "number" ? e.progress : 0;
-        const sys = inRange(e.sys, 60, 300);
-        const dia = inRange(e.dia, 20, 200);
-        if (sys !== undefined && dia !== undefined && sys > dia) last = { sys, dia };
-        const finished = haveProgress ? percent >= 100 : last !== undefined;
-        if (!finished) return progress(haveProgress ? percent / 100 : 0, null);
-        if (last) return finish();
-        // 100% bo'ldi, lekin qiymat hali yo'q: u keyingi paketda kelishi mumkin.
-        if (!grace) grace = later(finish, BP_RESULT_GRACE_MS);
-      };
-      // Progress bermaydigan soatlar uchun vaqt bo'yicha taxminiy progress.
-      ticker = setInterval(() => {
-        if (!haveProgress) progress(Math.min(0.95, elapsed() / BP_NO_PROGRESS_MS), null);
-      }, 500);
-      touch();
-      later(finish, BP_MAX_MS);
       break;
     }
 
@@ -742,11 +674,13 @@ export function startOnWatchBp(handlers: MeasureHandlers): () => void {
   const key = "pressurePump" as const;
   const since = Math.floor(Date.now() / 1000) - 30; // bosishdan sal oldin tugagan o'lchov ham hisoblanadi
   let over = false;
+  activeMeasures += 1;
   let pollTimer: ReturnType<typeof setTimeout> | undefined;
   let silenceTimer: ReturnType<typeof setTimeout> | undefined;
   const subscriptions: { remove: () => void }[] = [];
 
   const teardown = () => {
+    if (!over) activeMeasures -= 1;
     over = true;
     subscriptions.forEach((s) => s.remove());
     clearTimeout(pollTimer);
@@ -820,6 +754,6 @@ export function startOnWatchBp(handlers: MeasureHandlers): () => void {
 export function missingNativeFunctions(): string[] {
   const watch = watchModule as unknown as Record<string, unknown> | null;
   if (!watch) return [];
-  const required = ["getConnectionState", "startSpo2", "startBp", "startTemp", "startEcg", "readManualBp"];
+  const required = ["getConnectionState", "startSpo2", "startTemp", "startEcg", "readManualBp"];
   return required.filter((name) => typeof watch[name] !== "function");
 }

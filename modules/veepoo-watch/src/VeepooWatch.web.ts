@@ -23,8 +23,6 @@ class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
   stopHeart(): void {}
   startSpo2(): void {}
   stopSpo2(): void {}
-  startBp(): void {}
-  stopBp(): void {}
   startEcg(): void {}
   stopEcg(): void {}
   startTemp(): void {}
@@ -36,6 +34,12 @@ class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
   startCuffBp(_rawFlag: boolean): void {}
   stopCuffBp(): void {}
   readManualBp(_sinceSec: number): void {}
+  readManualData(): void {}
+  readDailyData(): void {}
+  readTextAlarms(): void {}
+  addTextAlarm(): void {}
+  deleteTextAlarm(): void {}
+  setTextAlarmOpen(): void {}
 
   readNotificationSwitches(): void {}
   setOtherNotifications(_on: boolean): void {}

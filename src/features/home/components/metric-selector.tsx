@@ -28,7 +28,7 @@ const TEXT = {
   textShadowRadius: 4,
 } as const;
 
-// Tepadagi o'lchovlar: 2 ustunli to'r, ustunlar to'lsa keyingi qatorga tushadi.
+// O'lchov kartalari: 2 ustunli to'r, ustunlar to'lsa keyingi qatorga tushadi.
 // Har bir kartada fon rasmi bor, ma'lumotlar uning ustida turadi.
 export function MetricSelector({
   metrics,
@@ -41,23 +41,8 @@ export function MetricSelector({
   const itemWidth = (width - PADDING * 2 - GAP * (COLS - 1)) / COLS;
 
   return (
-    <View
-      className="flex-row flex-wrap border-t border-border bg-surface py-4"
-      style={{
-        paddingHorizontal: PADDING,
-        gap: GAP,
-        borderTopEndRadius: 12,
-        borderTopStartRadius: 12,
-      }}
-    >
-      {/* Kartalar boshlanishidan oldin: nima qilish kerakligi haqida xabar (butun qatorni egallaydi) */}
-      <View style={{ width: "100%" }} className="gap-1">
-        <CusText variant="heading">O&apos;lchovni tanlang</CusText>
-        <CusText variant="caption" tone="muted">
-          Kerakli ko&apos;rsatkichni tanlab, yuqoridagi &quot;Boshlash&quot; tugmasini bosing.
-        </CusText>
-      </View>
-
+    // Sarlavha ("O'lchovni tanlang") va panel foni FeatureHome'da: ular qotib turadi, faqat shu kartalar scroll bo'ladi.
+    <View className="flex-row flex-wrap pb-4 pt-2" style={{ paddingHorizontal: PADDING, gap: GAP }}>
       {metrics.map((m) => (
         <MetricCardItem
           key={m.key}

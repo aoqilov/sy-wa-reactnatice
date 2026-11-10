@@ -28,10 +28,20 @@ export const FEATURE_KEYS: readonly WatchFeatureKey[] = [
 
 export type AutoMeasureItem = {
   type: string; // SDK nomi: PULSE_RATE, BLOOD_PRESSURE ...
+  /** `EAutoMeasureType.value` — soatga yozishda shu raqam yuboriladi (setAutoMeasure). */
+  typeValue: number | null;
   on: boolean;
   intervalMin: number;
   startMin: number; // kun boshidan daqiqa
   endMin: number;
+  /** Oraliq shu qadamga karrali bo'lishi kerak (daqiqa). */
+  stepUnit: number | null;
+  /** Soat oraliqni / vaqt oynasini o'zgartirishga ruxsat beradimi. */
+  intervalModifiable: boolean;
+  slotModifiable: boolean;
+  /** Vaqt oynasi shu chegaralar ichida bo'lishi kerak (kun boshidan daqiqa). */
+  supportStartMin: number | null;
+  supportEndMin: number | null;
 };
 
 export type WatchInfo = {
@@ -98,10 +108,16 @@ export function autoMeasureFromEvent(items: unknown): AutoMeasureItem[] | null {
   return (items as Record<string, unknown>[])
     .map((r) => ({
       type: asText(r.type) ?? "",
+      typeValue: asNumber(r.typeValue) ?? null,
       on: r.on === true,
       intervalMin: asNumber(r.intervalMin) ?? 0,
       startMin: asNumber(r.startMin) ?? 0,
       endMin: asNumber(r.endMin) ?? 0,
+      stepUnit: asNumber(r.stepUnit) ?? null,
+      intervalModifiable: r.intervalModifiable !== false,
+      slotModifiable: r.slotModifiable !== false,
+      supportStartMin: asNumber(r.supportStartMin) ?? null,
+      supportEndMin: asNumber(r.supportEndMin) ?? null,
     }))
     .filter((r) => r.type !== "");
 }

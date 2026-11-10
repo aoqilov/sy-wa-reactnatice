@@ -18,7 +18,6 @@ import com.veepoo.protocol.listener.base.IBleWriteResponse
 import com.veepoo.protocol.listener.base.IConnectResponse
 import com.veepoo.protocol.listener.base.INotifyResponse
 import com.veepoo.protocol.listener.data.IAutoMeasureSettingDataListener
-import com.veepoo.protocol.listener.data.IBPDetectDataListener
 import com.veepoo.protocol.listener.data.IBatteryDataListener
 import com.inuker.bluetooth.library.connect.response.BleWriteResponse
 import com.veepoo.protocol.listener.data.IBloodComponentDetectListener
@@ -37,7 +36,6 @@ import com.veepoo.protocol.listener.data.ISpo2hDataListener
 import com.veepoo.protocol.listener.data.ITemptureDetectDataListener
 import com.veepoo.protocol.model.datas.AutoMeasureData
 import com.veepoo.protocol.model.datas.BatteryData
-import com.veepoo.protocol.model.datas.BpData
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage1
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage2
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage3
@@ -51,11 +49,21 @@ import com.veepoo.protocol.model.datas.Spo2hData
 import com.veepoo.protocol.model.datas.TemptureDetectData
 import com.veepoo.protocol.model.datas.VPCuffBPTestData
 import com.veepoo.protocol.model.enums.EAutoMeasureType
-import com.veepoo.protocol.model.enums.EBPDetectModel
 import com.veepoo.protocol.model.enums.EFunctionStatus
 import com.veepoo.protocol.model.enums.EPwdStatus
 import com.veepoo.protocol.model.enums.ESocailMsg
 import com.veepoo.protocol.model.settings.ContentSocailSetting
+import com.veepoo.protocol.listener.data.IOriginData3Listener
+import com.veepoo.protocol.listener.data.IOriginDataListener
+import com.veepoo.protocol.listener.data.ITextAlarmDataListener
+import com.veepoo.protocol.model.datas.HRVOriginData
+import com.veepoo.protocol.model.datas.OriginData
+import com.veepoo.protocol.model.datas.OriginData3
+import com.veepoo.protocol.model.datas.OriginHalfHourData
+import com.veepoo.protocol.model.datas.Spo2hOriginData
+import com.veepoo.protocol.model.datas.TextAlarmData
+import com.veepoo.protocol.model.datas.TimeData
+import com.veepoo.protocol.model.settings.TextAlarm2Setting
 import com.veepoo.protocol.shareprence.VpSpGetUtil
 import com.veepoo.protocol.util.EcgUtil
 import com.veepoo.protocol.listener.data.IDeviceManualDetectDataListener
@@ -102,6 +110,8 @@ class WatchController(
   private var spo2Listener: ISpo2hDataListener? = null
   @Volatile private var ecgType = 0 // EKG ADC -> mV formulasining turi (EcgDetectState.ecgType)
   @Volatile private var glucoseListener: IBloodGlucoseChangeListener? = null
+  @Volatile private var watchDays = 3 // soat saqlaydigan kunlik ma'lumot (kun); ulanishda soat aytadi
+  private val textAlarmCache = ConcurrentHashMap<Int, TextAlarm2Setting>()
   private val autoMeasureCache = ConcurrentHashMap<Int, AutoMeasureData>()
 
   /** Ulanish urinishining raqami: Bluetooth o'chirilgan yoki uzilgandan keyin eski urinishning kech kelgan javoblari e'tiborsiz. */
@@ -337,6 +347,8 @@ class WatchController(
       },
       object : IDeviceFuctionDataListener {
         override fun onFunctionSupportDataChange(data: FunctionDeviceSupportData?) {
+          // Soat necha kunlik kunlik (5 daqiqalik) ma'lumot saqlaydi: readDailyData shundan foydalanadi.
+          data?.wathcDay?.let { if (it > 0) watchDays = it }
           // Shakar (qon glyukozasi): o'lchov, bitta qiymatli va ko'p nuqtali kalibrlash imkoniyatlari.
           emitData(
             "features",
@@ -482,39 +494,6 @@ class WatchController(
   fun stopSpo2() = safe("stopSpo2") {
     if (!ready) return@safe
     manager.stopDetectSPO2H(writer("stopDetectSPO2H"), spo2Listener)
-  }
-
-  /** Optik qon bosimi (umumiy rejim): soat o'zi yakunlaydi, jarayonni `progress` bilan bildiradi. */
-  fun startBp() = safe("startBp") {
-    if (!requireReady("startBp")) return@safe
-    // AAR bytecode'i (VPOperateManager.startDetectBP → FunctionCheckUtil.checkBp): `isSupportBp` false bo'lsa buyruq
-    // yuborilmaydi va callback ham kelmaydi (E500 da bosim nasos bilan). Jim kutib qolmaslik uchun aniq xabar.
-    if (!VpSpGetUtil.getVpSpVariInstance(appContext).isSupportBp) {
-      emitData("bp", "unsupported" to true)
-      return@safe
-    }
-    manager.startDetectBP(
-      writer("startDetectBP"),
-      object : IBPDetectDataListener {
-        override fun onDataChange(data: BpData?) {
-          if (data == null) return
-          emitData(
-            "bp",
-            "status" to data.status?.name,
-            "progress" to data.progress,
-            "haveProgress" to data.isHaveProgress,
-            "sys" to data.highPressure,
-            "dia" to data.lowPressure,
-          )
-        }
-      },
-      EBPDetectModel.DETECT_MODEL_PUBLIC,
-    )
-  }
-
-  fun stopBp() = safe("stopBp") {
-    if (!ready) return@safe
-    manager.stopDetectBP(writer("stopDetectBP"), EBPDetectModel.DETECT_MODEL_PUBLIC)
   }
 
   /** Tana harorati: soat o'zi yakunlaydi, jarayonni `progress` bilan bildiradi. */
@@ -848,6 +827,275 @@ class WatchController(
     )
   }
 
+  /**
+   * History sinxroni: soatning o'zida (yoki ilovadan) o'lchanib soat xotirasida qolgan yozuvlar, bir necha tur birga.
+   * [kinds]: "bp", "hr", "spo2", "temp", "glucose", "blood". [sinceSec]: shu vaqtdan (soniya, epoch) yangilari.
+   * Qiymatlarni SDK o'zi birlikka o'giradi (shakar va lipidlar /100, siydik kislotasi /10 — AAR bytecode'i, vp_aa).
+   * Natija "manualData" hodisasi bilan keladi: har tur uchun `{kind, records}`, oxirida `complete` yoki `failed`.
+   */
+  fun readManualData(sinceSec: Int, kinds: List<String>) = safe("readManualData") {
+    if (!requireReady("readManualData")) return@safe
+    val types = kinds.mapNotNull { MANUAL_TYPES[it] }.distinct()
+    if (types.isEmpty()) {
+      emitData("manualData", "complete" to true)
+      return@safe
+    }
+    val emit = { kind: String, records: List<Map<String, Any?>> -> emitData("manualData", "kind" to kind, "records" to records) }
+    manager.readDeviceManualData(
+      writer("readDeviceManualData"),
+      sinceSec.toLong(),
+      types,
+      types,
+      object : IDeviceManualDetectDataListener {
+        override fun onBloodPressureDataChange(list: MutableList<BloodPressureManualData>?) = emit(
+          "bp",
+          (list ?: emptyList()).map { d ->
+            mapOf("at" to d.timeStamp, "sys" to d.systolic, "dia" to d.diastolic, "hr" to d.heartRate, "mode" to d.measurementMode)
+          },
+        )
+
+        override fun onHeartRateDataChange(list: MutableList<HeartRateManualData>?) = emit(
+          "hr",
+          (list ?: emptyList()).map { d -> mapOf("at" to d.timeStamp, "values" to (d.rate?.toList() ?: emptyList())) },
+        )
+
+        override fun onBloodOxygenDataChange(list: MutableList<BloodOxygenManualData>?) = emit(
+          "spo2",
+          (list ?: emptyList()).map { d -> mapOf("at" to d.timeStamp, "values" to (d.oxygen?.toList() ?: emptyList())) },
+        )
+
+        override fun onBodyTemperatureDataChange(list: MutableList<BodyTemperatureManualData>?) = emit(
+          "temp",
+          (list ?: emptyList()).map { d -> mapOf("at" to d.timeStamp, "value" to d.temperature.toDouble()) },
+        )
+
+        override fun onBloodGlucoseDataChange(list: MutableList<BloodGlucoseManualData>?) = emit(
+          "glucose",
+          (list ?: emptyList()).map { d ->
+            mapOf("at" to d.timeStamp, "value" to d.bloodGlucoseValue.toDouble(), "risk" to d.risk?.name)
+          },
+        )
+
+        override fun onBloodComponentManualDataChange(list: MutableList<BloodComponentManualData>?) = emit(
+          "blood",
+          (list ?: emptyList()).map { d ->
+            mapOf(
+              "at" to d.timeStamp,
+              "uricAcid" to d.uricAcid.toDouble(),
+              "tcho" to d.gettCHO().toDouble(),
+              "tag" to d.gettAG().toDouble(),
+              "hdl" to d.gethDL().toDouble(),
+              "ldl" to d.getlDL().toDouble(),
+            )
+          },
+        )
+
+        override fun onPressureManualDataChange(list: MutableList<PressureManualData>?) = Unit
+        override fun onMetoManualDataChange(list: MutableList<MetoManualData>?) = Unit
+        override fun onHrvManualDataChange(list: MutableList<HrvManualData>?) = Unit
+        override fun onMiniCheckupManualDataChange(list: MutableList<MiniCheckupManualData>?) = Unit
+        override fun onEmotionManualDataChange(list: MutableList<EmotionManualData>?) = Unit
+        override fun onFatigueManualDataChange(list: MutableList<FatigueManualData>?) = Unit
+        override fun onSkinConductanceManualDataChange(list: MutableList<SkinConductanceManualData>?) = Unit
+
+        override fun onReadProgress(progress: Float) = Unit
+
+        override fun onReadComplete() {
+          emitData("manualData", "complete" to true)
+        }
+
+        override fun onReadFail() {
+          emitData("manualData", "failed" to true)
+        }
+      },
+    )
+  }
+
+  // ---------------------------------------------------------------- kunlik ma'lumot (avto-o'lchovlar)
+
+  /**
+   * Soatning kunlik 5 daqiqalik ma'lumoti: avto-o'lchash ("Rejam") natijalari shu yerga yoziladi — puls, bosim,
+   * harorat, (yangi protokolda) SpO2, shakar, qon tahlili. Bugundan boshlab [days] kun (soat saqlaganidan ko'p emas).
+   * SDK hujjati: protokol versiyasi 3 yoki 5 bo'lsa `IOriginData3Listener`, aks holda `IOriginDataListener`.
+   * Faqat biror o'lchov bor 5 daqiqalik yozuvlar yuboriladi: "dailyData" `{records}` (bo'laklab), oxirida
+   * `{complete}`, vaqt tugasa `{timeout}`. Vaqt soatning mahalliy vaqti (y, mo, d, h, mi) — JS Date'ga o'giradi.
+   */
+  fun readDailyData(days: Int) = safe("readDailyData") {
+    if (!requireReady("readDailyData")) return@safe
+    val span = days.coerceIn(1, watchDays.coerceAtLeast(1))
+    val records = ArrayList<Map<String, Any?>>()
+
+    fun flush() {
+      if (records.isEmpty()) return
+      emitData("dailyData", "records" to ArrayList(records))
+      records.clear()
+    }
+
+    fun positive(xs: IntArray?): List<Int>? = xs?.filter { it > 0 }?.takeIf { it.isNotEmpty() }
+
+    fun add(t: TimeData?, fields: Map<String, Any?>) {
+      if (t == null || fields.values.none { it != null }) return
+      records.add(mapOf("y" to t.year, "mo" to t.month, "d" to t.day, "h" to t.hour, "mi" to t.minute) + fields)
+      if (records.size >= 200) flush()
+    }
+
+    fun fromBase(d: OriginData): Map<String, Any?> = mapOf(
+      "hr" to d.rateValue.takeIf { it > 0 },
+      "sys" to d.highValue.takeIf { it > 0 },
+      "dia" to d.lowValue.takeIf { it > 0 },
+      "temp" to d.temperature.takeIf { it > 0 },
+    )
+
+    val useV3 = VpSpGetUtil.getVpSpVariInstance(appContext).originProtocolVersion.let { it == 3 || it == 5 }
+    if (useV3) {
+      manager.readOriginData(
+        writer("readOriginData"),
+        object : IOriginData3Listener {
+          override fun onOriginFiveMinuteListDataChange(list: MutableList<OriginData3>?) {
+            for (d in list ?: emptyList()) {
+              val bc = d.bloodComponent
+              val blood = bc?.let {
+                mapOf(
+                  "uricAcid" to it.uricAcid.toDouble(),
+                  "tcho" to it.tCHO.toDouble(),
+                  "tag" to it.tAG.toDouble(),
+                  "hdl" to it.hDL.toDouble(),
+                  "ldl" to it.lDL.toDouble(),
+                ).takeIf { m -> m.values.any { v -> v > 0 } }
+              }
+              add(
+                d.getmTime(),
+                fromBase(d) + mapOf(
+                  "hrs" to positive(d.ppgs),
+                  "spo2" to positive(d.oxygens),
+                  "glucose" to d.bloodGlucose.toDouble().takeIf { it > 0 },
+                  "blood" to blood,
+                ),
+              )
+            }
+            flush()
+          }
+
+          override fun onOriginHalfHourDataChange(data: OriginHalfHourData?) = Unit
+          override fun onOriginHRVOriginListDataChange(list: MutableList<HRVOriginData>?) = Unit
+          override fun onOriginSpo2OriginListDataChange(list: MutableList<Spo2hOriginData>?) = Unit
+          override fun onReadOriginProgressDetail(day: Int, date: String?, allPackage: Int, currentPackage: Int) = Unit
+          override fun onReadOriginProgress(progress: Float) = Unit
+
+          override fun onReadOriginComplete() {
+            flush()
+            emitData("dailyData", "complete" to true)
+          }
+
+          override fun onReadTimeout(day: Int) {
+            flush()
+            emitData("dailyData", "timeout" to true, "day" to day)
+          }
+        },
+        span,
+      )
+    } else {
+      manager.readOriginData(
+        writer("readOriginData"),
+        object : IOriginDataListener {
+          override fun onOringinFiveMinuteDataChange(d: OriginData?) {
+            if (d != null) add(d.getmTime(), fromBase(d))
+          }
+
+          override fun onOringinHalfHourDataChange(data: OriginHalfHourData?) = Unit
+          override fun onReadOriginProgressDetail(day: Int, date: String?, allPackage: Int, currentPackage: Int) = flush()
+          override fun onReadOriginProgress(progress: Float) = Unit
+
+          override fun onReadOriginComplete() {
+            flush()
+            emitData("dailyData", "complete" to true)
+          }
+
+          override fun onReadTimeout(day: Int) {
+            flush()
+            emitData("dailyData", "timeout" to true, "day" to day)
+          }
+        },
+        span,
+      )
+    }
+  }
+
+  // ---------------------------------------------------------------- soatdagi eslatmalar (matnli budilnik)
+
+  /**
+   * Matnli budilnik: soat belgilangan vaqtda o'z matnimizni ko'rsatib tebranadi (masalan "EKG o'lchash vaqti").
+   * Ko'pi bilan 10 ta (SDK hujjati). Har bir amaldan keyin "textAlarm" `{op, alarms}` keladi (op: SETTING_SUCCESS,
+   * ALARM_FULL, CLEAR_SUCCESS, READ_SUCCESS ...; soatda funksiya bo'lmasa UNSUPPORTED). O'chirish va yoqish/o'chirish
+   * uchun SDK obyektning o'zini oladi: oxirgi ro'yxatdan (textAlarmCache).
+   */
+  private fun textAlarmListener() = object : ITextAlarmDataListener {
+    override fun onAlarmDataChangeListListener(textAlarmData: TextAlarmData?) {
+      val list = textAlarmData?.textAlarm2SettingList ?: emptyList()
+      textAlarmCache.clear()
+      list.forEach { textAlarmCache[it.alarmId] = it }
+      emitData(
+        "textAlarm",
+        "op" to textAlarmData?.oprate?.name,
+        "alarms" to list.map {
+          mapOf(
+            "id" to it.alarmId,
+            "hour" to it.alarmHour,
+            "minute" to it.alarmMinute,
+            "repeat" to it.repeatStatus,
+            "content" to it.content,
+            "open" to it.isOpen,
+          )
+        },
+      )
+    }
+  }
+
+  private fun textAlarmSupported(): Boolean {
+    if (VpSpGetUtil.getVpSpVariInstance(appContext).isSupportTextAlarm) return true
+    emitData("textAlarm", "op" to "UNSUPPORTED")
+    return false
+  }
+
+  fun readTextAlarms() = safe("readTextAlarms") {
+    if (!requireReady("readTextAlarms") || !textAlarmSupported()) return@safe
+    manager.readTextAlarm(writer("readTextAlarm"), textAlarmListener())
+  }
+
+  /** [repeat]: 7 belgi, masalan "1111111" (vendor demo kabi: har kuni). */
+  fun addTextAlarm(hour: Int, minute: Int, repeat: String, content: String) = safe("addTextAlarm") {
+    if (!requireReady("addTextAlarm") || !textAlarmSupported()) return@safe
+    val setting = TextAlarm2Setting()
+    setting.isOpen = true
+    setting.repeatStatus = repeat
+    setting.unRepeatDate = "0000-00-00"
+    setting.alarmHour = hour
+    setting.alarmMinute = minute
+    setting.content = content
+    manager.addTextAlarm(writer("addTextAlarm"), textAlarmListener(), setting)
+  }
+
+  fun deleteTextAlarm(id: Int) = safe("deleteTextAlarm") {
+    if (!requireReady("deleteTextAlarm")) return@safe
+    val setting = textAlarmCache[id]
+    if (setting == null) {
+      emitData("error", "op" to "deleteTextAlarm", "message" to "Eslatma topilmadi: avval ro'yxatni o'qing")
+      return@safe
+    }
+    manager.deleteTextAlarm(writer("deleteTextAlarm"), textAlarmListener(), setting)
+  }
+
+  fun setTextAlarmOpen(id: Int, open: Boolean) = safe("setTextAlarmOpen") {
+    if (!requireReady("setTextAlarmOpen")) return@safe
+    val setting = textAlarmCache[id]
+    if (setting == null) {
+      emitData("error", "op" to "setTextAlarmOpen", "message" to "Eslatma topilmadi: avval ro'yxatni o'qing")
+      return@safe
+    }
+    setting.isOpen = open
+    manager.modifyTextAlarm(writer("modifyTextAlarm"), textAlarmListener(), setting)
+  }
+
   // ---------------------------------------------------------------- bildirishnoma (7.2)
 
   private fun socialListener(): ISocialMsgDataListener = object : ISocialMsgDataListener {
@@ -952,6 +1200,15 @@ class WatchController(
   companion object {
     private const val DEFAULT_PASSWORD = "0000"
     private const val ECG_GAIN = 20 // EcgUtil kuchaytirishi (vendor demo qiymati)
+    /** History sinxroni: JS'dagi tur nomi → SDK turi. */
+    private val MANUAL_TYPES = mapOf(
+      "bp" to DeviceManualDataType.BLOOD_PRESSURE,
+      "hr" to DeviceManualDataType.HEART_RATE,
+      "spo2" to DeviceManualDataType.BLOOD_OXYGEN,
+      "temp" to DeviceManualDataType.BODY_TEMPERATURE,
+      "glucose" to DeviceManualDataType.BLOOD_GLUCOSE,
+      "blood" to DeviceManualDataType.BLOOD_COMPOSITION,
+    )
 
     @Volatile private var sdkInitialized = false
   }

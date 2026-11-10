@@ -13,6 +13,7 @@ export { CusInput } from "./CusInput";
 export { CusKeyboardScrollView, useScrollToFocusedInput } from "./CusKeyboardScrollView";
 export { CusListItem } from "./CusListItem";
 export { CusMenuTabs } from "./CusMenuTabs";
+export { CusPageHeader } from "./CusPageHeader";
 export { CusScrollView } from "./CusScrollView";
 export { CusSelect } from "./CusSelect";
 export { CusSkeleton } from "./CusSkeleton";

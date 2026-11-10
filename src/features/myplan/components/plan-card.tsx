@@ -6,7 +6,7 @@ import type { Metric } from "@/features/home/api/get-metrics";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 
 import { Plan } from "../api/plans";
-import { intervalText, nextRun, perDay } from "../lib/schedule";
+import { intervalText, nextRun, perDay, windowText } from "../lib/schedule";
 
 type Props = {
   plan: Plan;
@@ -16,7 +16,7 @@ type Props = {
   onToggle: () => void;
 };
 
-// Bitta reja: o'lchov nomi, interval, kuniga nechta o'lchov va keyingi o'lchov vaqti.
+// Bitta reja: o'lchov nomi, interval va vaqt oynasi, kuniga nechta o'lchov va keyingi o'lchov vaqti.
 export function PlanCard({ plan, metric, now, onEdit, onToggle }: Props) {
   const primary = useThemeColor("primary", "#1E6FEB");
 
@@ -32,10 +32,12 @@ export function PlanCard({ plan, metric, now, onEdit, onToggle }: Props) {
         <CusSwitch value={plan.enabled} onValueChange={onToggle} />
       </View>
 
-      <CusText className="font-semibold">Har {intervalText(plan.intervalMin)}</CusText>
+      <CusText className="font-semibold">
+        Har {intervalText(plan.intervalMin)} · {windowText(plan.startMin, plan.endMin)}
+      </CusText>
       <CusText variant="caption" tone="muted">
-        Kuniga ~{perDay(plan.intervalMin)} ta o&apos;lchov
-        {plan.enabled ? ` · Keyingisi: ${nextRun(now, plan.intervalMin)}` : " · To'xtatilgan"}
+        Kuniga ~{perDay(plan.intervalMin, plan.startMin, plan.endMin)} ta o&apos;lchov
+        {plan.enabled ? ` · Keyingisi: ${nextRun(now, plan.intervalMin, plan.startMin, plan.endMin)}` : " · To'xtatilgan"}
       </CusText>
     </CusCard>
   );

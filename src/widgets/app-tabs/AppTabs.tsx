@@ -19,6 +19,18 @@ const TABS: { name: string; title: TranslationKey; icon: IconName }[] = [
   { name: "profile", title: "tabs.profile", icon: "person" },
 ];
 
+const TAB_BAR_HEIGHT = 68; // masshtab 1 da
+
+/**
+ * Tab bar sahifa ustida suzib turadi (position: absolute): sahifa pastida shuncha joy bo'sh qoldirilishi kerak,
+ * aks holda oxirgi kontent bar ostida qolib ketadi. Bar balandligi (interfeys masshtabi bilan) + pastki safe area + oraliq.
+ */
+export function useTabBarSpace(gap = 16): number {
+  const insets = useSafeAreaInsets();
+  const scale = useUiScale();
+  return insets.bottom + Math.round(TAB_BAR_HEIGHT * scale) + gap;
+}
+
 // Pastki navigatsiya: suzib turuvchi, yumaloq burchakli tab bar.
 export function AppTabs() {
   const insets = useSafeAreaInsets();
@@ -42,7 +54,7 @@ export function AppTabs() {
           position: "absolute",
           
           bottom: insets.bottom,
-          height: Math.round(68 * scale),
+          height: Math.round(TAB_BAR_HEIGHT * scale),
           paddingHorizontal: 6,
           borderTopLeftRadius: 14,
           borderTopRightRadius: 14,

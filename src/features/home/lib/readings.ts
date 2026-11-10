@@ -80,6 +80,29 @@ function gradePressure(sys: number, dia: number): Grade {
   return NORMAL;
 }
 
+/**
+ * Son qiymat(lar) bo'yicha holat — Home ham, History ham shu chegaralardan foydalanadi. Bosim: [yuqori, quyi];
+ * EKG: [puls]. Qon tahlili beshta ko'rsatkichdan iborat, uning holati `bloodSummary` da (bu yerda "normal").
+ */
+export function statusFor(key: MetricKey, nums: number[]): MetricStatus {
+  const [a, b] = nums;
+  switch (key) {
+    case "pulse":
+    case "ecg":
+      return gradePulse(a).status;
+    case "oxygen":
+      return gradeOxygen(a).status;
+    case "temperature":
+      return gradeTemperature(a).status;
+    case "sugar":
+      return gradeSugar(a).status;
+    case "pressurePump":
+      return gradePressure(a, b).status;
+    case "blood":
+      return "normal";
+  }
+}
+
 /** Soatdan kelgan xom natijani saqlanadigan ko'rinishga o'giradi. */
 export function toStoredReading(raw: RawReading, at = Date.now()): StoredReading {
   switch (raw.key) {
@@ -104,8 +127,7 @@ export function toStoredReading(raw: RawReading, at = Date.now()): StoredReading
       const s = bloodSummary(raw.parts);
       return { key: raw.key, value: s.value, status: s.status, statusLabel: `${s.label} · taxminiy`, at, blood: raw.parts };
     }
-    case "pressurePump":
-    case "pressureOptical": {
+    case "pressurePump": {
       const g = gradePressure(raw.sys, raw.dia);
       return { key: raw.key, value: `${raw.sys}/${raw.dia}`, status: g.status, statusLabel: g.label, at };
     }

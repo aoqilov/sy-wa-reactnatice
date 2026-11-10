@@ -141,6 +141,9 @@ export function WatchConnectScreen({ onDevSkip }: { onDevSkip?: () => void }) {
             <CusButton title={t("watchConnect.stop")} variant="ghost" size="sm" onPress={scanner.stop} />
           ) : null}
 
+          {/* Ulanish chiqmasa: Bluetooth aloqasini uzib, boshidan boshlash */}
+          <CusButton title={t("watchConnect.retry")} variant="ghost" size="sm" onPress={scanner.retry} />
+
           {scanner.devices.length > 0 ? (
             <View className="mt-2 gap-2">
               <CusText variant="heading">{t("watchConnect.found")}</CusText>

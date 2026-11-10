@@ -37,7 +37,7 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
  * O'lchash paytida doira ichida nima ko'rinishi (`synapse-soat/src/ui/ChannelRow.tsx` andozasi):
  *  - soatning o'zida o'lchash: kutish belgisi;
  *  - nasosli bosim: soat ekrani ochilguncha "…", keyin yostiqchadagi joriy bosim;
- *  - optik bosim, harorat va shakar: soat qiymat bermaydi, faqat foiz (yoki qolgan vaqt);
+ *  - harorat, shakar va qon tahlili: soat qiymat bermaydi, faqat foiz (yoki qolgan vaqt);
  *  - puls va SpO2: joriy qiymat, hali yo'q bo'lsa "--".
  */
 function liveDisplay(
@@ -53,7 +53,7 @@ function liveDisplay(
       ? { big: "…", caption: t("measure.note.opening") }
       : { big: String(run.live), caption: t("measure.note.cushion") };
   }
-  if (key === "pressureOptical" || key === "temperature") return { big: "…", caption: percent };
+  if (key === "temperature") return { big: "…", caption: percent };
   // Shakar: soat qiymatni faqat oxirida beradi.
   if (key === "sugar") return { big: "…", caption: `${percent} · ${t("measure.note.glucose")}` };
   // Qon tahlili: beshta qiymat faqat oxirida (doira ostidagi kartada hammasi birga).
@@ -155,12 +155,6 @@ export function useMeasurement(metrics: Metric[]) {
         return;
       }
       begin((handlers) => startMeasure(selectedKey, handlers), selectedKey, false);
-    },
-    /** Nasosli bosimni soatning o'zida o'lchab, natijani soatdan olish (ilovadan boshlashning muqobili). */
-    startOnWatch: () => {
-      if (run) return;
-      setError(null);
-      begin(startOnWatchBp, "pressurePump", true);
     },
     cancel: stopRun,
     /** EKG hisoboti: o'lchov tugagach o'zi ochiladi, yozuvlar ro'yxatidan ham ochiladi. */
