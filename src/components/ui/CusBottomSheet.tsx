@@ -8,8 +8,9 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { initialWindowMetrics, SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CusButton } from "./CusButton";
 import { CusScrollView } from "./CusScrollView";
 import { CusText } from "./CusText";
 
@@ -20,6 +21,7 @@ type Props = {
   onClose: () => void;
   title?: string;
   initialSnap?: Snap; // qaysi pog'onada ochilishi: "half" (0.5, standart) yoki "full" (1)
+  closeButton?: boolean; // pastda qotib turuvchi "Yopish" tugmasi (scroll bo'lmaydi); ma'lumot oynalari uchun
   children: ReactNode;
 };
 
@@ -32,7 +34,7 @@ const OFFSCREEN = 1200; // sheet ekrandan tashqarida turgan holati
 // - Doim 0.5 da ochiladi (ma'lumot ko'p bo'lsa ichida scroll bo'ladi).
 // - Tayoqchani tepaga tortsangiz 1 ga kengayadi. Pastga tortsangiz (0.5 da ham, 1 da ham) yopiladi.
 // Ochilish/yopilish animatsiyasini Modal emas, o'zimiz boshqaramiz.
-export function CusBottomSheet({ visible, onClose, title, initialSnap = "half", children }: Props) {
+export function CusBottomSheet({ visible, onClose, title, initialSnap = "half", closeButton = false, children }: Props) {
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
 
@@ -111,35 +113,55 @@ export function CusBottomSheet({ visible, onClose, title, initialSnap = "half", 
       navigationBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <Animated.View style={[styles.backdrop, { opacity: progress }]}>
-          <Pressable accessibilityLabel="Yopish" style={StyleSheet.absoluteFill} onPress={onClose} />
-        </Animated.View>
-
-        {/* Tashqi qatlam: faqat siljish (native animatsiya). Balandlik ichki qatlamda (JS animatsiya). */}
-        <Animated.View className="overflow-hidden bg-surface" style={[styles.sheet, { transform: [{ translateY }] }]}>
-          <Animated.View style={{ height: heightAnim, paddingBottom: insets.bottom + 8 }}>
-            {/* Shu qism tortiladi: tayoqcha va sarlavha */}
-            <View
-              {...panResponder.panHandlers}
-              className="items-center gap-3 px-4 pb-2 pt-3"
-            >
-              <View className="h-1.5 w-10 rounded-full bg-border" />
-              {title ? <CusText variant="heading">{title}</CusText> : null}
-            </View>
-
-            <CusScrollView
-              style={styles.scroll}
-              contentContainerClassName="gap-4 p-4"
-              bounces={false}
-            >
-              {children}
-            </CusScrollView>
+      {/* Android'da Modal alohida oyna: asosiy oynaning safe-area o'lchovi unda noto'g'ri (nol) bo'lishi mumkin, shuning uchun
+          oyna ichida o'z SafeAreaProvider'i. `initialMetrics` — o'lchov kelguncha birinchi kadr bo'sh qolmasin. */}
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <View style={styles.overlay}>
+          <Animated.View style={[styles.backdrop, { opacity: progress }]}>
+            <Pressable accessibilityLabel="Yopish" style={StyleSheet.absoluteFill} onPress={onClose} />
           </Animated.View>
-        </Animated.View>
-      </View>
+
+          {/* Tashqi qatlam: faqat siljish (native animatsiya). Balandlik ichki qatlamda (JS animatsiya). */}
+          <Animated.View className="overflow-hidden bg-surface" style={[styles.sheet, { transform: [{ translateY }] }]}>
+            <Animated.View style={{ height: heightAnim }}>
+              {/* Shu qism tortiladi: tayoqcha va sarlavha */}
+              <View
+                {...panResponder.panHandlers}
+                className="items-center gap-3 px-4 pb-2 pt-3"
+              >
+                <View className="h-1.5 w-10 rounded-full bg-border" />
+                {title ? <CusText variant="heading">{title}</CusText> : null}
+              </View>
+
+              <CusScrollView
+                style={styles.scroll}
+                contentContainerClassName="gap-4 p-4"
+                bounces={false}
+              >
+                {children}
+              </CusScrollView>
+
+              {/* Qotib turuvchi pastki panel: mazmun scroll bo'lsa ham tugma doim ko'rinadi */}
+              {closeButton ? (
+                <View className="border-t border-border bg-surface px-4 pt-3">
+                  <CusButton title="Yopish" onPress={onClose} />
+                </View>
+              ) : null}
+
+              {/* Pastki safe-area (navigatsiya paneli / jest chizig'i): tugma va mazmun uning ustida turadi */}
+              <BottomInset />
+            </Animated.View>
+          </Animated.View>
+        </View>
+      </SafeAreaProvider>
     </Modal>
   );
+}
+
+/** Modal oynasining pastki safe-area balandligi (+8): faqat Modal ichidagi `SafeAreaProvider` ostida chaqiriladi. */
+function BottomInset() {
+  const { bottom } = useSafeAreaInsets();
+  return <View style={{ height: bottom + 8 }} />;
 }
 
 // Joylashuv className ga bog'liq bo'lmasligi uchun oddiy style bilan yozilgan.

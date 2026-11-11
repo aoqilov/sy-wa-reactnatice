@@ -29,7 +29,7 @@ export function MetricInfoSheet({ metric, visible, onClose }: Props) {
   const info = METRIC_INFO[metric.key];
 
   return (
-    <CusBottomSheet visible={visible} onClose={onClose} title={`${metric.title} haqida`}>
+    <CusBottomSheet visible={visible} onClose={onClose} initialSnap="full" closeButton title={`${metric.title} haqida`}>
       {/* Tepada o'lchov rasmi, pastki chap burchagida ikon */}
       <View style={{ height: 180, borderRadius: 16, overflow: "hidden" }}>
         <CusImage

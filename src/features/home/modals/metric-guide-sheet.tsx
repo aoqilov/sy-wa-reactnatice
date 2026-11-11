@@ -40,6 +40,7 @@ export function MetricGuideSheet({ metric, visible, onClose }: Props) {
       visible={visible}
       onClose={onClose}
       initialSnap="full"
+      closeButton
       title={`${metric.title}: qanday o'lchanadi?`}
     >
       <CusMenuTabs tabs={TABS} value={tab} onChange={(v) => setTab(v as TabKey)} />

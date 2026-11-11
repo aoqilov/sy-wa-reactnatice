@@ -103,6 +103,16 @@ export function featuresFromEvent(e: Record<string, unknown>): Partial<Record<Wa
   return out;
 }
 
+/**
+ * Soat intervalli avto-o'lchash sozlamasini (SDK `readAutoMeasureSettingData`) qo'llaydimi. SDK buni o'zi
+ * `isSupportAutoMeasure` bayrog'i bilan tekshiradi: qo'llamasa Toast "This feature is not supported" ko'rsatib, javob
+ * bermasdan qaytadi. Shuning uchun faqat soat qo'llashini aniq aytgan bo'lsa (SUPPORT, SUPPORT_OPEN, SUPPORT_CLOSE) o'qiymiz;
+ * UNSUPPORT, UNKONW yoki bayroq kelmagan bo'lsa — yo'q (S105/E500: rutinalarni ilovaning o'zi yuritadi).
+ */
+export function isAutoMeasureSupported(features: WatchInfo["features"]): boolean {
+  return features.autoMeasure?.startsWith("SUPPORT") === true;
+}
+
 export function autoMeasureFromEvent(items: unknown): AutoMeasureItem[] | null {
   if (!Array.isArray(items)) return null;
   return (items as Record<string, unknown>[])

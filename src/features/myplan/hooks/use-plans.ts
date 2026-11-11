@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { MetricKey } from "@/features/home/api/get-metrics";
 import { useWatchConnection } from "@/shared/watch/watch-connection";
+import { isAutoMeasureSupported } from "@/shared/watch/watch-info";
 
 import {
   capabilitiesFrom,
@@ -37,10 +38,13 @@ const READ_WAIT_MS = 10_000;
 /**
  * Reja holati. `saved` — soatda hozir turgan jadval (watch-connection'dagi `info.autoMeasure` dan). `draft` —
  * foydalanuvchining yuborilmagan o'zgarishlari (null = o'zgarish yo'q, soatdagisi ko'rsatiladi).
- * Sahifa ochilganda jadval soatdan qayta o'qiladi.
+ * `active` — jadval ko'rinib turgan tabmi: jadval faqat shu tab ochiqligida soatdan o'qiladi (Bluetooth buyruqlari
+ * parallel bajarilmaydi, "Eslatmalar" tabi soatdan o'z ro'yxatini o'qiydi). Sahifa ochilganda jadval qayta o'qiladi.
+ * `supported` — soat avto-o'lchash jadvalini qo'llaydimi (qo'llamasa o'qishga urinilmaydi).
  */
-export function usePlans() {
+export function usePlans(active = true) {
   const { status, info } = useWatchConnection();
+  const supported = isAutoMeasureSupported(info.features);
   const [keys, setKeys] = useState<MetricKey[]>([]);
   const [draft, setDraft] = useState<Plan[] | null>(null);
   const [sending, setSending] = useState(false);
@@ -58,8 +62,8 @@ export function usePlans() {
   // Sahifa ochilganda soatdagi haqiqiy jadval o'qiladi (boshqa joyda — soatning o'zida — o'zgargan bo'lishi mumkin).
   useFocusEffect(
     useCallback(() => {
-      if (status === "ready") read();
-    }, [status, read]),
+      if (status === "ready" && active) read();
+    }, [status, active, read]),
   );
 
   // Jadval kelishini ko'p kutmaymiz: kelmasa, "o'qib bo'lmadi" holati.
@@ -122,6 +126,7 @@ export function usePlans() {
     plans,
     caps,
     connected: status === "ready",
+    supported,
     loaded: items !== null,
     reading,
     read,

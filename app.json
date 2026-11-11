@@ -2,7 +2,7 @@
   "expo": {
     "name": "Synapse Watch",
     "slug": "synapse-watch",
-    "owner": "akiylov",
+    "owner": "akiylovs-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "synapsewatch",
@@ -49,7 +49,7 @@
         }
       },
       "eas": {
-        "projectId": "a0a4a318-0a22-4187-bac0-b281fea96de4"
+        "projectId": "9b8dffba-a507-4fc7-a25b-dc1515fc322d"
       }
     }
   }

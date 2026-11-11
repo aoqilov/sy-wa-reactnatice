@@ -2,7 +2,7 @@ import type { MetricKey } from "@/features/home/api/get-metrics";
 import { getJSON, setJSON } from "@/shared/storage/storage";
 import { isMeasuring } from "@/shared/watch/measure";
 import { getWatchConnection } from "@/shared/watch/watch-connection";
-import type { AutoMeasureItem } from "@/shared/watch/watch-info";
+import { type AutoMeasureItem, isAutoMeasureSupported } from "@/shared/watch/watch-info";
 
 import watchModule, { type WatchEvent } from "../../../../modules/veepoo-watch";
 
@@ -92,9 +92,13 @@ export function savePlanKeys(keys: MetricKey[]): Promise<void> {
   return setJSON(KEYS_STORAGE, keys);
 }
 
-/** Soatning avto-o'lchash jadvalini qayta o'qishni so'raydi (natija watch-connection'dagi `info.autoMeasure` ga). */
+/**
+ * Soatning avto-o'lchash jadvalini qayta o'qishni so'raydi (natija watch-connection'dagi `info.autoMeasure` ga).
+ * Soat avto-o'lchash sozlamasini qo'llamasa, so'ramaydi: SDK Toast "This feature is not supported" ko'rsatib, javob bermaydi.
+ */
 export function requestWatchPlans(): boolean {
-  if (!watchModule || getWatchConnection().status !== "ready") return false;
+  const conn = getWatchConnection();
+  if (!watchModule || conn.status !== "ready" || !isAutoMeasureSupported(conn.info.features)) return false;
   try {
     watchModule.readAutoMeasure();
     return true;

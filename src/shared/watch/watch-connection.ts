@@ -9,6 +9,7 @@ import {
   autoMeasureFromEvent,
   EMPTY_INFO,
   featuresFromEvent,
+  isAutoMeasureSupported,
   loadWatchInfo,
   mergeInfo,
   saveWatchInfo,
@@ -216,7 +217,8 @@ export function refreshWatchInfo() {
     // SDK buyruqlarni parallel bajarmaydi: ikkinchisini biroz kechiktiramiz.
     setTimeout(() => {
       try {
-        if (state.status === "ready") watchModule?.readAutoMeasure();
+        // Qo'llamaydigan soatda SDK Toast ko'rsatib, javob bermaydi: o'qimaymiz.
+        if (state.status === "ready" && isAutoMeasureSupported(state.info.features)) watchModule?.readAutoMeasure();
       } catch {
         // Eski build'da funksiya bo'lmasligi mumkin.
       }

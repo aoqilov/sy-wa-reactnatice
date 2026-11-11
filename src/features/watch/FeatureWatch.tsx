@@ -13,7 +13,7 @@ import {
   useWatchConnection,
 } from "@/shared/watch/watch-connection";
 import { missingNativeFunctions } from "@/shared/watch/measure";
-import { FEATURE_KEYS, type WatchFeatureKey } from "@/shared/watch/watch-info";
+import { FEATURE_KEYS, isAutoMeasureSupported, type WatchFeatureKey } from "@/shared/watch/watch-info";
 import { BatteryIndicator } from "@/widgets/app-header/battery-indicator";
 
 import { WatchDevPanel } from "./WatchDevPanel";
@@ -168,7 +168,9 @@ export function FeatureWatch() {
       <CusCard className="py-2">
         {info.autoMeasure === null ? (
           <CusText tone="muted" className="py-2">
-            {t("watchInfo.autoMeasure.empty")}
+            {isAutoMeasureSupported(info.features)
+              ? t("watchInfo.autoMeasure.empty")
+              : t("watchInfo.autoMeasure.unsupported")}
           </CusText>
         ) : (
           info.autoMeasure.map((item) => (

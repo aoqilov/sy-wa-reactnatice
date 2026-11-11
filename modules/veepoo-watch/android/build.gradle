@@ -11,6 +11,8 @@ android {
   defaultConfig {
     versionCode 1
     versionName "0.1.0"
+    // Vendor SDK'lar (Proxy/reflection/JNI) R8 minify'dan himoyalanishi uchun — proguard-rules.pro'ga qarang.
+    consumerProguardFiles 'proguard-rules.pro'
   }
   lintOptions {
     abortOnError false

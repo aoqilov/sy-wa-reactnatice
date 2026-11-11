@@ -126,6 +126,12 @@ class VeepooWatchModule : Module() {
     Function("setAutoMeasure") { typeValue: Int, on: Boolean, intervalMin: Int, startMin: Int, endMin: Int ->
       controller().setAutoMeasure(typeValue, on, intervalMin, startMin, endMin)
     }
+
+    // Avto-o'lchash kalitlari (intervalsiz; S105/E500 shuni qo'llaydi)
+    Function("readAutoSwitches") { controller().readAutoSwitches() }
+    Function("setAutoSwitch") { key: String, on: Boolean -> controller().setAutoSwitch(key, on) }
+    Function("readSpo2Night") { controller().readSpo2Night() }
+    Function("setSpo2Night") { on: Boolean, startMin: Int, endMin: Int -> controller().setSpo2Night(on, startMin, endMin) }
   }
 
   private fun awaitBluetoothOn(promise: Promise, stepsLeft: Int) {

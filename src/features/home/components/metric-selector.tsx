@@ -1,58 +1,72 @@
 import Octicons from "@expo/vector-icons/Octicons";
-import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Pressable, useWindowDimensions, View } from "react-native";
 
-import { CusButton, CusImage, CusText } from "@/components/ui";
+import { CusText } from "@/components/ui";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 
-import { Metric } from "../api/get-metrics";
-import { METRIC_IMAGES } from "../constants/metric-images";
+import { EMPTY_VALUE, Metric, type MetricStatus } from "../api/get-metrics";
+import { METRIC_COLORS, withAlpha } from "../constants/metric-colors";
+import { Sparkline } from "./sparkline";
 
 type Props = {
   metrics: Metric[];
   selectedKey: Metric["key"];
   onSelect: (key: Metric["key"]) => void;
-  onInfo: (key: Metric["key"]) => void; // kartadagi "info" tugmasi bosilganda
+  onInfo: (key: Metric["key"]) => void; // kartadagi "info" belgisi bosilganda
 };
 
 const PADDING = 16; // chap va o'ng chetdan
 const GAP = 8; // kartalar orasidagi masofa
 const COLS = 2; // 2 ustun, kartalar pastga qarab tushadi (surish yo'q)
-// Rasm ustidagi qora qatlam (0 = yo'q, 1 = to'liq qora). Tanlangan karta yorqin, qolganlari xira ko'rinadi.
-const DIM_ACTIVE = 0.3;
-const DIM_INACTIVE = 0.68;
-// Rasm ustidagi matn: oq rang va qora soya (har qanday rasmda o'qilishi uchun).
-const TEXT = {
-  color: "#FFFFFF",
-  textShadowColor: "rgba(0,0,0,0.85)",
-  textShadowOffset: { width: 0, height: 1 },
-  textShadowRadius: 4,
-} as const;
+const SPARK_POINTS = 8; // mini grafikda nechta oxirgi o'lchov
+const SPARK_WIDTH = 56;
+const SPARK_WIDTH_WIDE = 120;
 
-// O'lchov kartalari: 2 ustunli to'r, ustunlar to'lsa keyingi qatorga tushadi.
-// Har bir kartada fon rasmi bor, ma'lumotlar uning ustida turadi.
-export function MetricSelector({
-  metrics,
-  selectedKey,
-  onSelect,
-  onInfo,
-}: Props) {
+// Holat yorlig'i (Normal / Past / Yuqori) ranglari: fon sinfi (to'liq nom: Tailwind uni statik ko'rishi kerak) va matn rangi
+// (`CusText` tone orqali: o'z standart rangi bilan sinf to'qnashuvi bo'lmasin).
+const CHIP: Record<MetricStatus | "none", { box: string; tone: "success" | "warning" | "danger" | "muted" }> = {
+  normal: { box: "bg-success-soft", tone: "success" },
+  warning: { box: "bg-warning-soft", tone: "warning" },
+  danger: { box: "bg-danger-soft", tone: "danger" },
+  none: { box: "bg-neutral-soft", tone: "muted" },
+};
+
+/** Oxirgi o'lchovlar, eskidan yangiga. Bosimda yuqori (sistolik) qiymat olinadi. Qon tahlili bitta son emas: grafik yo'q. */
+function sparkValues(m: Metric): number[] {
+  if (m.key === "blood") return [];
+  return m.history
+    .slice(0, SPARK_POINTS)
+    .map((h) => Number(h.value.split("/")[0]))
+    .filter(Number.isFinite)
+    .reverse();
+}
+
+// O'lchov kartalari: 2 ustunli to'r, ustunlar to'lsa keyingi qatorga tushadi. Toq sondagi oxirgi karta butun qatorni
+// egallaydi. Har bir kartada: nom, qiymat, rangli holat yorlig'i, mini grafik va oxirgi o'lchov vaqti. Karta o'z
+// o'lchovining rangida (constants/metric-colors.ts); holat yorlig'i esa holat rangida (yashil/sariq/qizil).
+export function MetricSelector({ metrics, selectedKey, onSelect, onInfo }: Props) {
   const { width } = useWindowDimensions();
 
   const itemWidth = (width - PADDING * 2 - GAP * (COLS - 1)) / COLS;
+  const wideWidth = itemWidth * COLS + GAP * (COLS - 1);
 
   return (
     // Sarlavha ("O'lchovni tanlang") va panel foni FeatureHome'da: ular qotib turadi, faqat shu kartalar scroll bo'ladi.
     <View className="flex-row flex-wrap pb-4 pt-2" style={{ paddingHorizontal: PADDING, gap: GAP }}>
-      {metrics.map((m) => (
-        <MetricCardItem
-          key={m.key}
-          metric={m}
-          width={itemWidth}
-          active={m.key === selectedKey}
-          onSelect={() => onSelect(m.key)}
-          onInfo={() => onInfo(m.key)}
-        />
-      ))}
+      {metrics.map((m, i) => {
+        const wide = metrics.length % COLS === 1 && i === metrics.length - 1;
+        return (
+          <MetricCardItem
+            key={m.key}
+            metric={m}
+            width={wide ? wideWidth : itemWidth}
+            sparkWidth={wide ? SPARK_WIDTH_WIDE : SPARK_WIDTH}
+            active={m.key === selectedKey}
+            onSelect={() => onSelect(m.key)}
+            onInfo={() => onInfo(m.key)}
+          />
+        );
+      })}
     </View>
   );
 }
@@ -60,98 +74,76 @@ export function MetricSelector({
 type CardProps = {
   metric: Metric;
   width: number;
+  sparkWidth: number;
   active: boolean;
   onSelect: () => void;
   onInfo: () => void;
 };
 
-function MetricCardItem({ metric: m, width, active, onSelect, onInfo }: CardProps) {
-  const primary = useThemeColor("primary", "#1E6FEB");
+function MetricCardItem({ metric: m, width, sparkWidth, active, onSelect, onInfo }: CardProps) {
+  const border = useThemeColor("border", "#E5E8EE");
+  const muted = useThemeColor("muted", "#6B7385");
+  const color = METRIC_COLORS[m.key]; // shu o'lchovning rangi: belgi, tanlangan chegara va grafik
+
+  const measured = m.value !== EMPTY_VALUE;
+  const chip = CHIP[measured ? m.status : "none"];
+  // Yorliq matni: "Normal · soat: past xavf · taxminiy" kabi uzun qatordan faqat holat ("Normal").
+  const chipLabel = measured ? m.statusLabel.split(" · ")[0] : m.updatedAt;
 
   return (
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
       onPress={onSelect}
-      // Tanlangan karta: yo'g'on ko'k chegara, yorqin rasm va burchakda "✓" belgisi.
-      // Chegara qalinligi doim bir xil (3), shunda tanlanganda karta ichi siljimaydi.
+      // Tanlangan karta: o'lchov rangidagi chegara va shu rangning yengil tusi. Chegara qalinligi doim bir xil (2),
+      // shunda tanlanganda ichi siljimaydi.
       style={{
         width,
-        alignItems: "center",
-        borderWidth: 3,
-        borderColor: active ? primary : "transparent",
+        borderWidth: 2,
+        borderColor: active ? color : border,
+        backgroundColor: active ? withAlpha(color, 0.12) : undefined,
       }}
-      className="gap-2 overflow-hidden rounded-xl px-3 py-3"
+      className={`gap-2 rounded-xl px-3 py-3 ${active ? "" : "bg-background"}`}
     >
-      {/* Fon rasmi va uning ustidagi qora qatlam */}
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <CusImage source={METRIC_IMAGES[m.key]} style={StyleSheet.absoluteFill} />
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: `rgba(0,0,0,${active ? DIM_ACTIVE : DIM_INACTIVE})` },
-          ]}
-        />
-      </View>
-
-      {/* Tanlanganlik belgisi */}
-      {active ? (
-        <View
-          pointerEvents="none"
-          className="items-center justify-center rounded-full"
-          style={{
-            position: "absolute",
-            top: 6,
-            right: 6,
-            width: 22,
-            height: 22,
-            backgroundColor: primary,
-          }}
-        >
-          <Octicons name="check" size={14} color="#FFFFFF" />
+      <View className="flex-row items-center gap-2">
+        <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: withAlpha(color, 0.18) }}>
+          <Octicons name={m.icon} size={16} color={color} />
         </View>
-      ) : null}
-
-      <View className="flex-row items-center justify-center gap-2 self-stretch">
-        <Octicons name={m.icon} size={16} color="#FFFFFF" />
-        <CusText
-          variant="caption"
-          className="shrink font-semibold"
-          style={TEXT}
-          numberOfLines={1}
-        >
+        <CusText variant="caption" className="flex-1 font-semibold" numberOfLines={1}>
           {m.title}
         </CusText>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${m.title} haqida ma'lumot`}
+          onPress={onInfo}
+          hitSlop={10}
+        >
+          <Octicons name="info" size={16} color={muted} />
+        </Pressable>
       </View>
 
-      <View className="items-center self-stretch">
-        <CusText
-          className="text-center text-xl font-bold"
-          style={TEXT}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
+      <View>
+        <CusText className="text-2xl font-bold" tone={measured ? "default" : "muted"} numberOfLines={1} adjustsFontSizeToFit>
           {m.value}
         </CusText>
-        <CusText
-          variant="caption"
-          className="text-center"
-          style={TEXT}
-          numberOfLines={1}
-        >
+        <CusText variant="caption" tone="muted" numberOfLines={1}>
           {m.unit}
         </CusText>
       </View>
 
-      {/* Karta oxiri: info tugmasi */}
-      <CusButton
-        title="Info"
-        variant="outline"
-        size="sm"
-        className="self-stretch"
-        accessibilityLabel={`${m.title} haqida ma'lumot`}
-        onPress={onInfo}
-      />
+      <View className="flex-row items-center justify-between gap-2" style={{ minHeight: 22 }}>
+        <View className={`shrink rounded-full px-2 py-0.5 ${chip.box}`}>
+          <CusText variant="caption" tone={chip.tone} className="font-semibold" numberOfLines={1}>
+            {chipLabel}
+          </CusText>
+        </View>
+        {measured ? <Sparkline values={sparkValues(m)} color={color} width={sparkWidth} /> : null}
+      </View>
+
+      {/* O'lchanmagan kartada ham bir xil balandlik: bo'sh joy ushlab turiladi */}
+      <CusText variant="caption" tone="muted" numberOfLines={1}>
+        {measured ? m.updatedAt : " "}
+      </CusText>
     </Pressable>
   );
 }

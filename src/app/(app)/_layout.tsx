@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { startRoutineRunner } from "@/features/myplan/lib/routine-runner";
 import { AppHeader } from "@/widgets/app-header/AppHeader";
 import { AppTabs } from "@/widgets/app-tabs/AppTabs";
 import { WatchGate } from "@/widgets/watch-gate/WatchGate";
@@ -9,6 +11,9 @@ import { WatchGate } from "@/widgets/watch-gate/WatchGate";
 // Soat ulanmaguncha hammasini WatchGate (to'liq ekranli "Soatni ulang") to'sib turadi.
 export default function AppLayout() {
   const insets = useSafeAreaInsets();
+
+  // Rejam → Rutinalar: jadval bo'yicha o'lchashni so'rab turadi (ilova ochiq va soat ulangan bo'lganda).
+  useEffect(() => startRoutineRunner(), []);
 
   return (
     <View className="flex-1 bg-background">

@@ -33,6 +33,23 @@ export function prependReading(readings: StoredReading[], next: StoredReading): 
   return [next, ...readings].slice(0, MAX_READINGS);
 }
 
+// Home'dan tashqarida (rutina) o'lchangan natija: xotiradagi ro'yxatga qo'shiladi va ochiq ekranlar xabardor qilinadi.
+// Home o'z ro'yxatini xotirada saqlaydi, shuning uchun `subscribeReadings` bilan xotiradan qayta o'qiydi (aks holda keyingi
+// o'z natijasi bilan rutina natijasini bosib yuboradi).
+const listeners = new Set<() => void>();
+
+export function subscribeReadings(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export async function appendReading(next: StoredReading): Promise<void> {
+  await saveReadings(prependReading(await loadReadings(), next));
+  listeners.forEach((l) => l());
+}
+
 // ---- Holatni baholash ----
 
 type Grade = { status: MetricStatus; label: string };

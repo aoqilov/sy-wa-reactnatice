@@ -53,6 +53,11 @@ class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
     _startMin: number,
     _endMin: number
   ): void {}
+
+  readAutoSwitches(): void {}
+  setAutoSwitch(_key: string, _on: boolean): void {}
+  readSpo2Night(): void {}
+  setSpo2Night(_on: boolean, _startMin: number, _endMin: number): void {}
 }
 
 export default registerWebModule(VeepooWatchWeb, 'VeepooWatch');

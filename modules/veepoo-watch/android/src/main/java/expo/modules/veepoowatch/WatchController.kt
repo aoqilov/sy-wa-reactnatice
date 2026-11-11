@@ -17,8 +17,10 @@ import com.veepoo.protocol.listener.base.IABleConnectStatusListener
 import com.veepoo.protocol.listener.base.IBleWriteResponse
 import com.veepoo.protocol.listener.base.IConnectResponse
 import com.veepoo.protocol.listener.base.INotifyResponse
+import com.veepoo.protocol.listener.data.IAllSetDataListener
 import com.veepoo.protocol.listener.data.IAutoMeasureSettingDataListener
 import com.veepoo.protocol.listener.data.IBatteryDataListener
+import com.veepoo.protocol.listener.data.ICustomSettingDataListener
 import com.inuker.bluetooth.library.connect.response.BleWriteResponse
 import com.veepoo.protocol.listener.data.IBloodComponentDetectListener
 import com.veepoo.protocol.listener.data.IBloodGlucoseChangeListener
@@ -34,6 +36,7 @@ import com.veepoo.protocol.listener.data.IPwdDataListener
 import com.veepoo.protocol.listener.data.ISocialMsgDataListener
 import com.veepoo.protocol.listener.data.ISpo2hDataListener
 import com.veepoo.protocol.listener.data.ITemptureDetectDataListener
+import com.veepoo.protocol.model.datas.AllSetData
 import com.veepoo.protocol.model.datas.AutoMeasureData
 import com.veepoo.protocol.model.datas.BatteryData
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage1
@@ -48,11 +51,15 @@ import com.veepoo.protocol.model.datas.PwdData
 import com.veepoo.protocol.model.datas.Spo2hData
 import com.veepoo.protocol.model.datas.TemptureDetectData
 import com.veepoo.protocol.model.datas.VPCuffBPTestData
+import com.veepoo.protocol.model.enums.EAllSetType
 import com.veepoo.protocol.model.enums.EAutoMeasureType
 import com.veepoo.protocol.model.enums.EFunctionStatus
 import com.veepoo.protocol.model.enums.EPwdStatus
 import com.veepoo.protocol.model.enums.ESocailMsg
+import com.veepoo.protocol.model.settings.AllSetSetting
 import com.veepoo.protocol.model.settings.ContentSocailSetting
+import com.veepoo.protocol.model.settings.CustomSetting
+import com.veepoo.protocol.model.settings.CustomSettingData
 import com.veepoo.protocol.listener.data.IOriginData3Listener
 import com.veepoo.protocol.listener.data.IOriginDataListener
 import com.veepoo.protocol.listener.data.ITextAlarmDataListener
@@ -113,6 +120,8 @@ class WatchController(
   @Volatile private var watchDays = 3 // soat saqlaydigan kunlik ma'lumot (kun); ulanishda soat aytadi
   private val textAlarmCache = ConcurrentHashMap<Int, TextAlarm2Setting>()
   private val autoMeasureCache = ConcurrentHashMap<Int, AutoMeasureData>()
+  /** Soatdan oxirgi o'qilgan "shaxsiylashtirish" sozlamasi: kalit yozishda shundan nusxa olinadi ([setAutoSwitch]). */
+  @Volatile private var customSettingCache: CustomSettingData? = null
 
   /** Ulanish urinishining raqami: Bluetooth o'chirilgan yoki uzilgandan keyin eski urinishning kech kelgan javoblari e'tiborsiz. */
   @Volatile private var session = 0
@@ -1196,6 +1205,102 @@ class WatchController(
       if (endMin >= 0) data.currentEndMinute = endMin
       manager.setAutoMeasureSettingData(writer("setAutoMeasureSettingData"), data, autoMeasureListener())
     }
+
+  // ---------------------------------------------------------------- avto-o'lchash kalitlari (7.5, intervalsiz)
+  //
+  // S105/E500 intervalli `AutoMeasureData` API'sini qo'llamaydi (isSupportAutoMeasure = false: SDK Toast ko'rsatib, javob
+  // bermaydi). Soat o'z jadvali bilan o'lchaydi, ilova esa har bir ko'rsatkich uchun faqat yoqish/o'chirish kalitini yozadi:
+  // puls, bosim, HRV, harorat, shakar, qon tarkibi — "shaxsiylashtirish" sozlamasida (readCustomSetting/changeCustomSetting),
+  // kechasi SpO2 — alohida (readSpo2hAutoDetect/settingSpo2hAutoDetect). synapse-soat'dagi `VPSettingAutomatic*Test` kalitlari
+  // shular. Bu to'rt buyruq SDK'da FunctionCheckUtil tekshiruvidan o'tmaydi: Toast chiqmaydi.
+
+  private fun customSettingListener(): ICustomSettingDataListener = object : ICustomSettingDataListener {
+    override fun OnSettingDataChange(customSettingData: CustomSettingData?) {
+      val data = customSettingData ?: return
+      val status = data.status?.name
+      // Faqat muvaffaqiyatli **o'qish** keyingi yozuvlar uchun asos bo'ladi: yozish javobida o'zgargan kalit hali eski bo'lishi mumkin.
+      if (status == "READ_SUCCESS") customSettingCache = data
+      emitData(
+        "autoSwitches",
+        "status" to status,
+        "heartRate" to data.autoHeartDetect?.name,
+        "bloodPressure" to data.autoBpDetect?.name,
+        "hrv" to data.autoHrv?.name,
+        "temperature" to data.autoTemperatureDetect?.name,
+        "bloodGlucose" to data.bloodGlucoseDetection?.name,
+        "bloodComponent" to data.bloodComponentDetect?.name,
+      )
+    }
+  }
+
+  fun readAutoSwitches() = safe("readAutoSwitches") {
+    if (!requireReady("readAutoSwitches")) return@safe
+    manager.readCustomSetting(writer("readCustomSetting"), customSettingListener())
+  }
+
+  /**
+   * Bitta ko'rsatkichning avto-o'lchash kalitini yozadi. Avval [readAutoSwitches] chaqirilgan bo'lishi kerak: SDK
+   * buyruqni soat oxirgi yuborgan sozlamadan quradi (`CustomSetting(CustomSettingData)` hamma maydonni nusxalaydi),
+   * shuning uchun faqat shu kalit o'zgaradi. `key`: heartRate | bloodPressure | hrv | temperature | bloodGlucose | bloodComponent.
+   */
+  fun setAutoSwitch(key: String, on: Boolean) = safe("setAutoSwitch") {
+    if (!requireReady("setAutoSwitch")) return@safe
+    val data = customSettingCache
+    if (data == null) {
+      emitData("error", "op" to "setAutoSwitch", "message" to "Kalit holati hali o'qilmagan: avval readAutoSwitches")
+      return@safe
+    }
+    val setting = CustomSetting(data)
+    val status = if (on) EFunctionStatus.SUPPORT_OPEN else EFunctionStatus.SUPPORT_CLOSE
+    when (key) {
+      "heartRate" -> setting.setOpenAutoHeartDetect(on)
+      "bloodPressure" -> setting.setOpenAutoBpDetect(on)
+      "hrv" -> setting.setIsOpenAutoHRV(status)
+      "temperature" -> setting.setIsOpenAutoTemperatureDetect(status)
+      "bloodGlucose" -> setting.setIsOpenBloodGlucoseDetect(status)
+      "bloodComponent" -> setting.setIsOpenBloodComponentDetect(status)
+      else -> {
+        emitData("error", "op" to "setAutoSwitch", "message" to "Noma'lum kalit: $key")
+        return@safe
+      }
+    }
+    manager.changeCustomSetting(writer("changeCustomSetting"), customSettingListener(), setting)
+  }
+
+  private fun spo2NightListener(): IAllSetDataListener = object : IAllSetDataListener {
+    override fun onAllSetDataChangeListener(allSetData: AllSetData?) {
+      val d = allSetData ?: return
+      emitData(
+        "spo2Night",
+        "result" to d.oprateResult?.name,
+        "open" to (d.openState == 1),
+        "startMin" to d.startHour * 60 + d.startMinute,
+        "endMin" to d.endHour * 60 + d.endMinute,
+      )
+    }
+  }
+
+  fun readSpo2Night() = safe("readSpo2Night") {
+    if (!requireReady("readSpo2Night")) return@safe
+    manager.readSpo2hAutoDetect(writer("readSpo2hAutoDetect"), spo2NightListener())
+  }
+
+  /** Kechasi SpO2 ni avto-o'lchash: `startMin`..`endMin` — kun boshidan daqiqa (masalan 22:00 = 1320 .. 08:00 = 480). */
+  fun setSpo2Night(on: Boolean, startMin: Int, endMin: Int) = safe("setSpo2Night") {
+    if (!requireReady("setSpo2Night")) return@safe
+    val fromMin = startMin.coerceIn(0, 1439)
+    val untilMin = endMin.coerceIn(0, 1439)
+    val setting = AllSetSetting(
+      EAllSetType.SPO2H_NIGHT_AUTO_DETECT,
+      fromMin / 60,
+      fromMin % 60,
+      untilMin / 60,
+      untilMin % 60,
+      0, // oprate: 0 = yozish
+      if (on) 1 else 0,
+    )
+    manager.settingSpo2hAutoDetect(writer("settingSpo2hAutoDetect"), spo2NightListener(), setting)
+  }
 
   companion object {
     private const val DEFAULT_PASSWORD = "0000"

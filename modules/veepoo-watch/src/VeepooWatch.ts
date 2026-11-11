@@ -66,6 +66,19 @@ declare class VeepooWatchModule extends NativeModule<VeepooWatchEvents> {
   readAutoMeasure(): void;
   /** `startMin`/`endMin` manfiy bo'lsa soatdagi joriy oraliq saqlanadi. */
   setAutoMeasure(typeValue: number, on: boolean, intervalMin: number, startMin: number, endMin: number): void;
+
+  /**
+   * Avto-o'lchash kalitlari (intervalsiz): S105/E500 intervalli `readAutoMeasure` ni qo'llamaydi, lekin shu kalitlarni biladi.
+   * Hodisa "autoSwitches": `{status, heartRate, bloodPressure, hrv, temperature, bloodGlucose, bloodComponent}` — `status`
+   * READ_SUCCESS | SETTING_SUCCESS | FAIL | UNKNOW, qolganlari `EFunctionStatus` nomi (SUPPORT_OPEN | SUPPORT_CLOSE | UNSUPPORT).
+   */
+  readAutoSwitches(): void;
+  /** `key`: heartRate | bloodPressure | hrv | temperature | bloodGlucose | bloodComponent. Avval `readAutoSwitches` kerak. */
+  setAutoSwitch(key: string, on: boolean): void;
+  /** Kechasi SpO2 avto-o'lchash. Hodisa "spo2Night": `{result, open, startMin, endMin}` (`result` — `EAllSetStatus` nomi). */
+  readSpo2Night(): void;
+  /** `startMin`/`endMin` — kun boshidan daqiqa (masalan 22:00 = 1320 .. 08:00 = 480). */
+  setSpo2Night(on: boolean, startMin: number, endMin: number): void;
 }
 
 // Native modulni JSI orqali yuklaydi. Web'da `VeepooWatch.web.ts` (bo'sh stub) ishlatiladi.

@@ -5,6 +5,7 @@ import { useT } from "@/shared/i18n/use-t";
 import { getWatchConnection } from "@/shared/watch/watch-connection";
 import {
   canMeasure,
+  isMeasuring,
   type MeasureHandlers,
   type MeasureProgress,
   startMeasure,
@@ -12,7 +13,15 @@ import {
 } from "@/shared/watch/measure";
 
 import { Metric } from "../api/get-metrics";
-import { applyReadings, loadReadings, prependReading, saveReadings, type StoredReading, toStoredReading } from "../lib/readings";
+import {
+  applyReadings,
+  loadReadings,
+  prependReading,
+  saveReadings,
+  type StoredReading,
+  subscribeReadings,
+  toStoredReading,
+} from "../lib/readings";
 
 type MetricKey = Metric["key"];
 
@@ -81,7 +90,17 @@ export function useMeasurement(metrics: Metric[]) {
       readingsRef.current = saved;
       setReadings(saved);
     });
-    return () => cancelRef.current?.();
+    // Rutina (Rejam) o'lchagan natija xotiraga yozilgach: ro'yxatni xotiradan yangilaymiz.
+    const unsubscribe = subscribeReadings(() => {
+      loadReadings().then((saved) => {
+        readingsRef.current = saved;
+        setReadings(saved);
+      });
+    });
+    return () => {
+      unsubscribe();
+      cancelRef.current?.();
+    };
   }, []);
 
   const items = metrics.map((m) => applyReadings(m, readings)); // hamma o'lchovlar (tanlagich uchun)
@@ -150,6 +169,11 @@ export function useMeasurement(metrics: Metric[]) {
     start: () => {
       if (run) return;
       setError(null);
+      // Soat bir ishni bajaradi: Rejam rutinasi hozir o'lchayotgan bo'lsa, parallel boshlamaymiz.
+      if (isMeasuring()) {
+        setError(t("measure.error.busy"));
+        return;
+      }
       if (!canMeasure(selectedKey)) {
         setError(t("measure.unsupported"));
         return;

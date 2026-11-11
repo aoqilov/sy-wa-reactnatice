@@ -13,9 +13,9 @@ import Animated, {
 import Svg, { Circle } from "react-native-svg";
 
 import { CusButton, CusText } from "@/components/ui";
-import { useThemeColor } from "@/shared/theme/use-theme-color";
 
 import { EMPTY_VALUE, Metric, MetricStatus } from "../api/get-metrics";
+import { METRIC_COLORS, withAlpha } from "../constants/metric-colors";
 
 const TONE: Record<MetricStatus, "success" | "warning" | "danger"> = {
   normal: "success",
@@ -53,8 +53,9 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 // sari to'lib boradi, uchida mil (nuqta) aylanadi. Aylana yopilganda o'lchov tugaydi. Soat hali foiz bermagan
 // bo'lsa (masalan soat ekrani ochilmoqda) mil to'xtamay sekin aylanadi: ilova qotmagan, kutilmoqda.
 export function MeasureCircle({ metric, measuring, progress, display, onStart, onCancel }: Props) {
-  const primary = useThemeColor("primary", "#1E6FEB");
-  const track = useThemeColor("border", "#E5E8EE");
+  // Doira chegarasi tanlangan o'lchovning rangida: bo'sh turganda yumshoq tus, o'lchashda to'lib boruvchi yoy va mil to'liq rangda.
+  const color = METRIC_COLORS[metric.key];
+  const track = withAlpha(color, 0.3);
 
   const fill = useSharedValue(0); // 0..1, yoy
   const spin = useSharedValue(0); // gradus, kutish paytidagi aylanish
@@ -110,7 +111,7 @@ export function MeasureCircle({ metric, measuring, progress, display, onStart, o
             cx={SIZE / 2}
             cy={SIZE / 2}
             r={RADIUS}
-            stroke={primary}
+            stroke={color}
             strokeWidth={STROKE}
             strokeLinecap="round"
             strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
@@ -120,7 +121,7 @@ export function MeasureCircle({ metric, measuring, progress, display, onStart, o
         </Svg>
       </View>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, handStyle]}>
-        <View style={[styles.hand, { backgroundColor: primary }]} />
+        <View style={[styles.hand, { backgroundColor: color }]} />
       </Animated.View>
 
       <CusText tone="muted">{metric.title}</CusText>
