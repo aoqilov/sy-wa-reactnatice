@@ -15,8 +15,19 @@ export type Routine = {
 /** Tanlanadigan intervallar (daqiqa): 5 ... 60, 2 soat, 3 soat. */
 export const INTERVALS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 120, 180] as const;
 
-/** Rutinaga qo'shiladigan o'lchovlar. EKG yo'q: u barmoqni elektrodga qo'yishni talab qiladi. */
-export const ROUTINE_KEYS: readonly MetricKey[] = ["pulse", "oxygen", "pressurePump", "temperature", "sugar", "blood"];
+/**
+ * Rutinaga qo'shiladigan o'lchovlar. EKG va tana tarkibi yo'q: ular barmoqni elektrodga qo'yishni talab qiladi.
+ * HRV ham yo'q: S105 uni ilovadan boshlashga ruxsat bermaydi (faqat soatning o'zida o'lchanadi).
+ */
+export const ROUTINE_KEYS: readonly MetricKey[] = [
+  "pulse",
+  "oxygen",
+  "pressurePump",
+  "temperature",
+  "sugar",
+  "blood",
+  "stress",
+];
 
 const STORAGE_KEY = "myplan.routines.v1";
 

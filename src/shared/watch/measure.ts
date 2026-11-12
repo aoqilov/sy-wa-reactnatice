@@ -13,7 +13,10 @@ export type MeasureKey =
   | "temperature"
   | "ecg"
   | "sugar"
-  | "blood";
+  | "blood"
+  | "hrv"
+  | "stress"
+  | "bodyComp";
 
 const MEASURABLE: readonly string[] = [
   "pulse",
@@ -23,6 +26,9 @@ const MEASURABLE: readonly string[] = [
   "ecg",
   "sugar",
   "blood",
+  "hrv",
+  "stress",
+  "bodyComp",
 ];
 
 /** Home'dagi o'lchov soatda o'lchanadimi. */
@@ -37,6 +43,10 @@ export type RawReading =
   /** Qon tahlili (optik, taxminiy): beshta qiymat birga. */
   | { key: "blood"; parts: BloodParts }
   | { key: "pressurePump"; sys: number; dia: number; pulse?: number }
+  /** HRV (ms), stress (0..100). */
+  | { key: "hrv" | "stress"; value: number }
+  /** Tana tarkibi (elektrod orqali, taxminiy). */
+  | { key: "bodyComp"; body: BodyParts }
   /** EKG: `value` — o'rtacha puls; qolganlari soat bergan bo'lsa. `trace` — to'lqin (mV, 0.5 Hz filtrlangan). */
   | {
       key: "ecg";
@@ -57,6 +67,17 @@ export type GlucoseRisk = "LOW" | "MIDDLE" | "HIGH";
 
 /** Qon tahlili: siydik kislotasi µmol/l; umumiy xolesterin, triglitseridlar, HDL, LDL — mmol/l. */
 export type BloodParts = { uricAcid: number; tcho: number; tag: number; hdl: number; ldl: number };
+
+/** Tana tarkibi: BMI; yog', mushak, suv — %; mushak, suyak — kg; asosiy almashinuv (BMR) — kkal. */
+export type BodyParts = {
+  bmi: number;
+  fatPct: number;
+  musclePct?: number;
+  muscleKg?: number;
+  waterPct?: number;
+  boneKg?: number;
+  bmr?: number;
+};
 
 /** Tarjima kaliti: `measure.error.<kod>` */
 export type MeasureError =
@@ -87,10 +108,12 @@ export type MeasureError =
   | "glucoseUnsupported"
   | "glucoseNoData"
   | "bloodUnsupported"
-  | "bloodNoData";
+  | "bloodNoData"
+  | "featureUnsupported"
+  | "onWatchNoneHrv";
 
 /** O'lchash davom etayotganda foydalanuvchiga ko'rsatiladigan ogohlantirish (xato emas). Tarjima kaliti: `measure.hint.<kod>` */
-export type MeasureHint = "posture" | "moved" | "onWatch" | "ecgContact";
+export type MeasureHint = "posture" | "moved" | "onWatch" | "onWatchHrv" | "ecgContact";
 
 export type MeasureProgress = {
   /** 0..1 */
@@ -129,6 +152,15 @@ const BLOOD_IDLE_MS = 15_000;
 const BLOOD_MAX_MS = 150_000;
 const BLOOD_RESULT_GRACE_MS = 5_000;
 const SAMPLES_USED = 8;
+// HRV: soat foiz bermaydi, qiymatlarni oqim bilan yuboradi. Shuncha vaqtdan keyin borlari bilan yakunlanadi.
+const HRV_EXPECTED_MS = 60_000;
+const HRV_IDLE_MS = 20_000;
+const HRV_MAX_MS = 90_000;
+// Stress, tana tarkibi: soat foiz yuboradi va o'zi yakunlaydi.
+const DETECT_IDLE_MS = 15_000;
+const DETECT_MAX_MS = 150_000;
+const BODY_NO_CONTACT = 15; // barmoq hali tegmagan: shuncha paket kutiladi
+const BODY_LEAD_OFF = 4; // SDK: barmoq 4 marta ketma-ket ko'tarilsa, ilova o'lchovni to'xtatadi
 // EKG paytida soat boshqa ishda: band (optik o'lchov va h.k.), zaryadda yoki batareya past.
 const ECG_BUSY = ["BUSY", "DETECT_BP", "DETECT_HEART", "DETECT_AUTO_FIVE", "DETECT_SP", "DETECT_FTG", "DETECT_PPG", "CHARGING", "CHARG_LOW"];
 
@@ -175,6 +207,50 @@ function bloodParts(e: WatchEvent): BloodParts | undefined {
   return { uricAcid, tcho, tag, hdl, ldl };
 }
 
+/** HRV, stress, tana tarkibi xatolari: SDK holat nomi (yoki native "UNSUPPORTED") → ilova xato kodi. */
+function detectError(state: unknown): MeasureError {
+  switch (String(state)) {
+    case "UNSUPPORTED":
+      return "featureUnsupported";
+    case "BUSY":
+      return "busy";
+    case "LOW_POWER":
+      return "lowBattery";
+    case "WEAR_OFF":
+      return "notWorn";
+    default:
+      return "noData";
+  }
+}
+
+/**
+ * Tana tarkibi natijasi. SDK hujjatida qiymatlar ba'zan "10 barobar" deyilgan: yog' ulushi oqilona chegaradan (2..60 %)
+ * katta bo'lsa, hammasi 10 ga bo'linadi. Asosiy ikkitasi (BMI, yog' %) bo'lmasa natija yaroqsiz.
+ */
+function bodyParts(e: WatchEvent): BodyParts | undefined {
+  const raw = (k: string) => {
+    const v = e[k];
+    return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  };
+  const scale = (raw("fatPct") ?? 0) > 60 ? 0.1 : 1;
+  const get = (k: string) => {
+    const v = raw(k);
+    return v !== undefined && v > 0 ? Math.round(v * scale * 10) / 10 : undefined;
+  };
+  const bmi = inRange(get("bmi"), 5, 80);
+  const fatPct = inRange(get("fatPct"), 2, 60);
+  if (bmi === undefined || fatPct === undefined) return undefined;
+  return {
+    bmi,
+    fatPct,
+    musclePct: get("musclePct"),
+    muscleKg: get("muscleKg"),
+    waterPct: get("waterPct"),
+    boneKg: get("boneKg"),
+    bmr: get("bmr"),
+  };
+}
+
 /** Musbat son bo'lsa o'zi, aks holda undefined (soat yo'q qiymatni 0 deb yuboradi). */
 function positive(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
@@ -185,6 +261,20 @@ const noop = () => {};
 /** Hozir soatda o'lchov ketyaptimi: History sinxroni shu paytda soatga so'rov yubormaydi (soat bir ishni bajaradi). */
 let activeMeasures = 0;
 export const isMeasuring = () => activeMeasures > 0;
+
+/**
+ * Soatni boshqa uzoq ish (siferblat uzatish) uchun band qiladi: shu paytda o'lchov, rutina va tarix sinxroni
+ * boshlanmaydi (ular `isMeasuring()` ni tekshiradi). Qaytgan funksiya bandlikni bo'shatadi (bir marta).
+ */
+export function holdWatch(): () => void {
+  activeMeasures += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    activeMeasures -= 1;
+  };
+}
 
 /** O'lchashni boshlaydi. Qaytgan funksiya o'lchashni bekor qiladi (soatga to'xtatish buyrug'i yuboriladi). */
 export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => void {
@@ -643,6 +733,108 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
       later(() => finish(), ECG_MAX_MS);
       break;
     }
+
+    case "hrv": {
+      // SDK (IHrvDetectListener): qiymatlar o'lchov davomida keladi ("hrv"), foiz yo'q; soat to'xtasa "hrvStop".
+      // Progress vaqt bo'yicha; HRV_EXPECTED_MS dan keyin (yoki soat to'xtasa) oxirgi qiymatlar medianasi.
+      const samples: number[] = [];
+      let live: number | null = null;
+      let idle: ReturnType<typeof setTimeout> | undefined;
+      stopOnSuccess = true;
+      const finish = () =>
+        samples.length ? done({ key, value: median(samples.slice(-SAMPLES_USED)) }) : fail("noData");
+      const touch = () => {
+        cancelLater(idle);
+        idle = later(finish, HRV_IDLE_MS);
+      };
+      startNative = () => watch.startHrv();
+      stopNative = () => watch.stopHrv();
+      onEvent = (e) => {
+        if (e.type === "hrvError") return fail(detectError(e.state));
+        if (e.type === "hrvStop") return finish();
+        if (e.type !== "hrv") return;
+        touch();
+        const v = inRange(e.value, 5, 300);
+        if (v !== undefined) {
+          samples.push(v);
+          live = v;
+        }
+      };
+      ticker = setInterval(() => {
+        progress(Math.min(0.97, elapsed() / HRV_EXPECTED_MS), live);
+        if (elapsed() >= HRV_EXPECTED_MS && samples.length > 0) finish();
+      }, 250);
+      touch();
+      later(finish, HRV_MAX_MS);
+      break;
+    }
+
+    case "stress": {
+      // SDK (IPressureDetectListener): "stress" {progress}, "stressDone" {value 0..100}. Soat o'zi yakunlaydi.
+      let idle: ReturnType<typeof setTimeout> | undefined;
+      const touch = () => {
+        cancelLater(idle);
+        idle = later(() => fail("noData"), DETECT_IDLE_MS);
+      };
+      startNative = () => watch.startStress();
+      stopNative = () => watch.stopStress();
+      onEvent = (e) => {
+        if (e.type === "stressError") return fail(detectError(e.state));
+        if (e.type === "stressStop") return fail("noData"); // natijasiz to'xtadi
+        if (e.type === "stressDone") {
+          const v = inRange(e.value, 0, 100);
+          if (v === undefined) return fail("noData");
+          finishedBySelf = true;
+          return done({ key, value: Math.round(v) });
+        }
+        if (e.type !== "stress") return;
+        touch();
+        progress((typeof e.progress === "number" ? e.progress : 0) / 100, null);
+      };
+      touch();
+      later(() => fail("noData"), DETECT_MAX_MS);
+      break;
+    }
+
+    case "bodyComp": {
+      // SDK (IBodyComponentDetectListener): "body" {progress, lead}, "bodyDone" {qiymatlar}. Elektrod orqali: barmoq
+      // soatning metall qismiga tegib turishi kerak (lead 0). Barmoq ketma-ket ko'tarilsa o'lchov to'xtatiladi.
+      let contacted = false;
+      let offStreak = 0;
+      let idle: ReturnType<typeof setTimeout> | undefined;
+      stopOnSuccess = true;
+      const touch = () => {
+        cancelLater(idle);
+        idle = later(() => fail("noData"), DETECT_IDLE_MS);
+      };
+      startNative = () => watch.startBodyComp();
+      stopNative = () => watch.stopBodyComp();
+      onEvent = (e) => {
+        if (e.type === "bodyError") return fail(detectError(e.state));
+        if (e.type === "bodyStop") return fail("noData"); // natijasiz to'xtadi
+        if (e.type === "bodyDone") {
+          const parts = bodyParts(e);
+          if (!parts) return fail("noData");
+          finishedBySelf = true;
+          return done({ key, body: parts });
+        }
+        if (e.type !== "body") return;
+        touch();
+        const contact = e.lead === 0;
+        if (contact) {
+          contacted = true;
+          offStreak = 0;
+        } else {
+          offStreak += 1;
+          if (!contacted && offStreak >= BODY_NO_CONTACT) return fail("ecgNoContact");
+          if (contacted && offStreak >= BODY_LEAD_OFF) return fail("ecgLeadOff");
+        }
+        progress((typeof e.progress === "number" ? e.progress : 0) / 100, null, contact ? null : "ecgContact");
+      };
+      touch();
+      later(() => fail("noData"), DETECT_MAX_MS);
+      break;
+    }
   }
 
   progress(0, null);
@@ -655,6 +847,96 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
 
   return () => {
     if (!over) teardown(true);
+  };
+}
+
+/**
+ * HRV soatning o'zida o'lchanadi, ilova natijani soat xotirasidan kutadi. S105 uni ilovadan boshlashga ruxsat bermaydi:
+ * `isSupportHrvAppDetect` false, SDK `startDetectHrv` buyrug'ini yubormaydi (AAR bayt-kodi:
+ * FunctionCheckUtil.checkHrvAppDetect). Shuning uchun `startOnWatchBp` andozasi: har 5 s da `readManualData(since, ["hrv"])`,
+ * `since` dan yangi yozuv chiqquncha.
+ */
+export function startOnWatchManual(key: "hrv", handlers: MeasureHandlers): () => void {
+  const watch = watchModule;
+  if (!watch) {
+    handlers.onError("unavailable");
+    return noop;
+  }
+
+  const kind = key; // native "manualData" turi o'lchov kaliti bilan bir xil
+  const since = Math.floor(Date.now() / 1000) - 30; // bosishdan sal oldin tugagan o'lchov ham hisoblanadi
+  let over = false;
+  activeMeasures += 1;
+  let pollTimer: ReturnType<typeof setTimeout> | undefined;
+  let silenceTimer: ReturnType<typeof setTimeout> | undefined;
+  const subscriptions: { remove: () => void }[] = [];
+
+  const teardown = () => {
+    if (!over) activeMeasures -= 1;
+    over = true;
+    subscriptions.forEach((s) => s.remove());
+    clearTimeout(pollTimer);
+    clearTimeout(silenceTimer);
+    clearTimeout(capTimer);
+  };
+  const done = (value: number) => {
+    if (over) return;
+    teardown();
+    handlers.onDone({ key, value });
+  };
+  const fail = (error: MeasureError) => {
+    if (over) return;
+    teardown();
+    handlers.onError(error);
+  };
+
+  /** Yozuvdan qiymat: HRV — ms qiymatlar ro'yxatining medianasi. */
+  const valueOf = (r: Record<string, unknown>): number | undefined => {
+    const values = (Array.isArray(r.values) ? r.values : []).filter(
+      (v): v is number => typeof v === "number" && v >= 5 && v <= 300,
+    );
+    return values.length ? median(values) : undefined;
+  };
+
+  const again = () => {
+    clearTimeout(silenceTimer);
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(ask, ON_WATCH_POLL_MS);
+  };
+  const ask = () => {
+    if (over) return;
+    clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(again, ON_WATCH_SILENCE_MS);
+    try {
+      watch.readManualData(since, [kind]);
+    } catch (err) {
+      fail(err instanceof TypeError ? "outdated" : "noReply");
+    }
+  };
+
+  subscriptions.push(
+    watch.addListener("connection", (c) => {
+      if (c.state === "disconnected" || c.state === "error") fail("lost");
+    }),
+    watch.addListener("event", (e) => {
+      if (over || e.type !== "manualData") return;
+      if (e.kind === kind && Array.isArray(e.records)) {
+        const found = (e.records as Record<string, unknown>[])
+          .filter((r) => typeof r.at === "number" && r.at >= since && valueOf(r) !== undefined)
+          .sort((a, b) => Number(b.at) - Number(a.at))[0];
+        if (found) return done(valueOf(found) as number);
+      }
+      // O'qish tugadi, lekin yangi yozuv yo'q: biroz kutib, yana so'raymiz.
+      if (e.complete === true || e.failed === true) again();
+    }),
+  );
+
+  const capTimer = setTimeout(() => fail("onWatchNoneHrv"), ON_WATCH_MAX_MS);
+  handlers.onProgress({ progress: 0, live: null, hint: "onWatchHrv" });
+  ask();
+
+  return () => {
+    if (!over) teardown();
   };
 }
 

@@ -1,6 +1,6 @@
 import { NativeModule, registerWebModule } from 'expo';
 
-import type { ConnectionEvent, NotifyVariant, VeepooWatchEvents } from './VeepooWatch.types';
+import type { CallForwardStatus, ConnectionEvent, NotifyVariant, VeepooWatchEvents } from './VeepooWatch.types';
 
 // Web build maqsad emas (docs/watch-integration-plan.md, qaror 5). Bu stub faqat web'da import yiqilmasligi uchun.
 class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
@@ -31,6 +31,14 @@ class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
   stopGlucose(): void {}
   startBloodComponent(): void {}
   stopBloodComponent(): void {}
+  startHrv(): void {}
+  stopHrv(): void {}
+  startStress(): void {}
+  stopStress(): void {}
+  startMet(): void {}
+  stopMet(): void {}
+  startBodyComp(): void {}
+  stopBodyComp(): void {}
   startCuffBp(_rawFlag: boolean): void {}
   stopCuffBp(): void {}
   readManualBp(_sinceSec: number): void {}
@@ -45,6 +53,17 @@ class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
   setOtherNotifications(_on: boolean): void {}
   sendNotification(_title: string, _body: string, _variant: NotifyVariant): void {}
 
+  setCallNotifications(_on: boolean): void {}
+  sendIncomingCall(_name: string, _number: string): void {}
+  endIncomingCall(): void {}
+  setCallForwarding(_on: boolean): void {}
+  getCallForwardStatus(): CallForwardStatus {
+    return { enabled: false, listening: false, phoneState: false, callLog: false, contacts: false, answerCalls: false };
+  }
+
+  readSteps(): void {}
+  syncPersonInfo(): void {}
+
   readAutoMeasure(): void {}
   setAutoMeasure(
     _typeValue: number,
@@ -54,6 +73,9 @@ class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
     _endMin: number
   ): void {}
 
+  readDialInfo(): void {}
+  loadDialMarket(_deviceNumber: string, _deviceTestVersion: string): void {}
+  installDial(_fileUrl: string, _crc: string): void {}
   readAutoSwitches(): void {}
   setAutoSwitch(_key: string, _on: boolean): void {}
   readSpo2Night(): void {}

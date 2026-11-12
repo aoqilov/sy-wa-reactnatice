@@ -23,6 +23,15 @@ import com.veepoo.protocol.listener.data.IBatteryDataListener
 import com.veepoo.protocol.listener.data.ICustomSettingDataListener
 import com.inuker.bluetooth.library.connect.response.BleWriteResponse
 import com.veepoo.protocol.listener.data.IBloodComponentDetectListener
+import com.veepoo.protocol.listener.data.IBodyComponentDetectListener
+import com.veepoo.protocol.listener.data.IHrvDetectListener
+import com.veepoo.protocol.listener.data.IMetDetectListener
+import com.veepoo.protocol.listener.data.IPressureDetectListener
+import com.veepoo.protocol.model.datas.BodyComponent
+import com.veepoo.protocol.model.enums.DetectState
+import com.veepoo.protocol.model.enums.HrvDetectState
+import com.veepoo.protocol.model.enums.MetDetectState
+import com.veepoo.protocol.model.enums.PressureDetectState
 import com.veepoo.protocol.listener.data.IBloodGlucoseChangeListener
 import com.veepoo.protocol.model.datas.BloodComponent
 import com.veepoo.protocol.model.enums.EBloodComponentDetectState
@@ -58,6 +67,14 @@ import com.veepoo.protocol.model.enums.EPwdStatus
 import com.veepoo.protocol.model.enums.ESocailMsg
 import com.veepoo.protocol.model.settings.AllSetSetting
 import com.veepoo.protocol.model.settings.ContentSocailSetting
+import com.veepoo.protocol.model.settings.ContentPhoneSetting
+import com.veepoo.protocol.listener.data.IPhoneListener
+import com.veepoo.protocol.listener.data.ISportDataListener
+import com.veepoo.protocol.listener.data.IPersonInfoDataListener
+import com.veepoo.protocol.model.datas.SportData
+import com.veepoo.protocol.model.datas.PersonInfoData
+import com.veepoo.protocol.model.enums.ESex
+import com.veepoo.protocol.model.enums.EOprateStauts
 import com.veepoo.protocol.model.settings.CustomSetting
 import com.veepoo.protocol.model.settings.CustomSettingData
 import com.veepoo.protocol.listener.data.IOriginData3Listener
@@ -93,7 +110,29 @@ import com.veepoo.protocol.model.datas.MiniCheckupManualData
 import com.veepoo.protocol.model.datas.PressureManualData
 import com.veepoo.protocol.model.datas.SkinConductanceManualData
 import com.veepoo.protocol.model.enums.DeviceManualDataType
+import android.os.Handler
+import android.os.Looper
+import com.inuker.bluetooth.library.connect.response.BleNotifyResponse
+import com.inuker.bluetooth.library.jieli.dial.JLWatchFaceManager
+import com.inuker.bluetooth.library.jieli.dial.JLWatchHolder
+import com.inuker.bluetooth.library.jieli.response.RcspAuthResponse
+import com.jieli.jl_fatfs.model.FatFile
+import com.jieli.jl_rcsp.model.base.BaseError
+import com.veepoo.protocol.listener.data.IMtuChangeListener
+import com.veepoo.protocol.listener.data.IUIBaseInfoFormServerListener
+import com.veepoo.protocol.listener.data.IUiUpdateListener
+import com.veepoo.protocol.listener.oad.OnDownLoadListener
+import com.veepoo.protocol.model.TUiTheme
+import com.veepoo.protocol.model.datas.UIDataServer
+import com.veepoo.protocol.model.enums.EUIFromType
+import com.veepoo.protocol.model.enums.EUiUpdateError
+import com.veepoo.protocol.util.UiServerHttpUtil
+import com.veepoo.protocol.util.UiUpdateUtil
+import java.io.File
+import java.io.FileInputStream
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 
 /**
  * Veepoo SDK (VPOperateManager) bilan ishlaydi, JavaScript'ga bog'liq emas.
@@ -113,6 +152,8 @@ class WatchController(
   @Volatile private var ready = false
   @Volatile private var lastState = "disconnected"
   @Volatile private var lastSocial: FunctionSocailMsgData? = null
+  /** Telefon qo'ng'iroqlarini soatga uzatish (CallBridge.kt). */
+  private val callBridge: CallBridge
   private var statusListener: IABleConnectStatusListener? = null
   private var spo2Listener: ISpo2hDataListener? = null
   @Volatile private var ecgType = 0 // EKG ADC -> mV formulasining turi (EcgDetectState.ecgType)
@@ -148,6 +189,17 @@ class WatchController(
     }
     manager = VPOperateManager.getInstance()
 
+    callBridge = CallBridge(
+      appContext,
+      isReady = { ready },
+      showCall = { name, number ->
+        ensurePhoneListener()
+        manager.sendSocialMsgContent(writer("callIncoming"), ContentPhoneSetting(ESocailMsg.PHONE, name, number))
+      },
+      hideCall = { manager.offhookOrIdlePhone(writer("callOver")) },
+      emit = { type, data -> emitData(type, *data.toList().toTypedArray()) },
+    )
+
     val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       appContext.registerReceiver(bluetoothReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -163,6 +215,7 @@ class WatchController(
     } catch (ignored: IllegalArgumentException) {
       // Allaqachon olib tashlangan.
     }
+    callBridge.release()
   }
 
   // ---------------------------------------------------------------- yordamchilar
@@ -410,7 +463,11 @@ class WatchController(
   private fun markReady() {
     if (ready) return
     ready = true
+    jlAuthed = false // yangi ulanish: Jieli autentifikatsiyasi qaytadan
+    phoneListenerSet = false // qo'ng'iroq tugmalari tinglovchisi ham qaytadan o'rnatiladi
+    dialServerInfo = null
     registerStatusListener()
+    if (callBridge.enabled) ensurePhoneListener()
     emitConn("ready")
   }
 
@@ -722,6 +779,162 @@ class WatchController(
     )
   }
 
+  // ---------------------------------------------------------------- HRV, stress, MET, tana tarkibi
+  //
+  // To'rttasida bir xil sxema (SDK hujjati, "HRV function" / "Pressure (Stress) Function" / "MET Feature" /
+  // "Body composition function"): "<tur>" — jarayon (progress, joriy qiymat), "<tur>Done" — yakuniy natija,
+  // "<tur>Error" {state} — SDK holat nomi yoki "UNSUPPORTED", "<tur>Stop" — o'lchov to'xtadi.
+  // Qo'llab-quvvatlash SDK bayrog'i bilan oldindan tekshiriladi: funksiya bo'lmasa SDK jim qolishi mumkin.
+  // Listener interfeyslari Kotlin'da, parametrlari non-null (AAR bayt-kodi bilan tekshirilgan).
+
+  private var hrvListener: IHrvDetectListener? = null
+
+  /** HRV (ms). Soat qiymatlarni o'lchov davomida yuboradi, yakunda "hrvStop". */
+  fun startHrv() = safe("startHrv") {
+    if (!requireReady("startHrv")) return@safe
+    val sp = VpSpGetUtil.getVpSpVariInstance(appContext)
+    if (!sp.isSupportHRV() || !sp.isSupportHrvAppDetect()) {
+      emitData("hrvError", "state" to "UNSUPPORTED")
+      return@safe
+    }
+    val listener = object : IHrvDetectListener {
+      override fun onHrvDetect(hrv: Int) {
+        emitData("hrv", "value" to hrv)
+      }
+
+      override fun onDetectFailed(detectState: HrvDetectState) {
+        emitData("hrvError", "state" to detectState.name)
+      }
+
+      override fun onDetectStop() {
+        emitData("hrvStop")
+      }
+    }
+    hrvListener = listener
+    manager.startDetectHrv(bleWriter("startDetectHrv"), listener)
+  }
+
+  fun stopHrv() = safe("stopHrv") {
+    if (!ready) return@safe
+    val listener = hrvListener ?: return@safe
+    manager.stopDetectHrv(bleWriter("stopDetectHrv"), listener)
+  }
+
+  /** Stress (SDK'da "pressure"): 0..100. Natija "stressDone" {value}. */
+  fun startStress() = safe("startStress") {
+    if (!requireReady("startStress")) return@safe
+    if (!VpSpGetUtil.getVpSpVariInstance(appContext).isSupportStress()) {
+      emitData("stressError", "state" to "UNSUPPORTED")
+      return@safe
+    }
+    manager.startDetectPressure(
+      bleWriter("startDetectPressure"),
+      object : IPressureDetectListener {
+        override fun onDetecting(progress: Int) {
+          emitData("stress", "progress" to progress)
+        }
+
+        override fun onDetectSuccess(pressure: Int) {
+          emitData("stressDone", "value" to pressure)
+        }
+
+        override fun onDetectFailed(detectState: PressureDetectState) {
+          emitData("stressError", "state" to detectState.name)
+        }
+
+        override fun onDetectStop() {
+          emitData("stressStop")
+        }
+      },
+    )
+  }
+
+  fun stopStress() = safe("stopStress") {
+    if (!ready) return@safe
+    manager.stopDetectPressure(bleWriter("stopDetectPressure"))
+  }
+
+  /** MET: "met" {progress, value}; progress 100 da qiymat yakuniy. */
+  fun startMet() = safe("startMet") {
+    if (!requireReady("startMet")) return@safe
+    val sp = VpSpGetUtil.getVpSpVariInstance(appContext)
+    if (!sp.isSupportMet() || !sp.isSupportMetAppDetect()) {
+      emitData("metError", "state" to "UNSUPPORTED")
+      return@safe
+    }
+    manager.startDetectMet(
+      bleWriter("startDetectMet"),
+      object : IMetDetectListener {
+        override fun onMetDetect(progress: Int, met: Float) {
+          emitData("met", "progress" to progress, "value" to Math.round(met * 10.0) / 10.0)
+        }
+
+        override fun onDetectFailed(detectState: MetDetectState) {
+          emitData("metError", "state" to detectState.name)
+        }
+
+        override fun onDetectStop() {
+          emitData("metStop")
+        }
+      },
+    )
+  }
+
+  fun stopMet() = safe("stopMet") {
+    if (!ready) return@safe
+    manager.stopDetectMet(bleWriter("stopDetectMet"))
+  }
+
+  /**
+   * Tana tarkibi (elektrod orqali, EKG kabi barmoq soatning metall qismiga tegib turadi). "body" {progress, lead}:
+   * lead 0 — barmoq tegib turibdi, 1 — ko'tarildi (SDK: 4 marta ketma-ket ko'tarilsa ilova o'lchovni to'xtatadi).
+   */
+  fun startBodyComp() = safe("startBodyComp") {
+    if (!requireReady("startBodyComp")) return@safe
+    if (!VpSpGetUtil.getVpSpVariInstance(appContext).isSupportBodyComponent()) {
+      emitData("bodyError", "state" to "UNSUPPORTED")
+      return@safe
+    }
+    manager.startDetectBodyComponent(
+      bleWriter("startDetectBodyComponent"),
+      object : IBodyComponentDetectListener {
+        override fun onDetecting(progress: Int, leadState: Int) {
+          emitData("body", "progress" to progress, "lead" to leadState)
+        }
+
+        override fun onDetectSuccess(bodyComponent: BodyComponent) {
+          emitData("bodyDone", *bodyParts(bodyComponent))
+        }
+
+        override fun onDetectFailed(detectState: DetectState) {
+          emitData("bodyError", "state" to detectState.name)
+        }
+
+        override fun onDetectStop() {
+          emitData("bodyStop")
+        }
+      },
+    )
+  }
+
+  fun stopBodyComp() = safe("stopBodyComp") {
+    if (!ready) return@safe
+    manager.stopDetectBodyComponent(bleWriter("stopDetectBodyComponent"))
+  }
+
+  private fun bodyParts(b: BodyComponent): Array<Pair<String, Any?>> {
+    val r = { v: Float -> Math.round(v * 10.0) / 10.0 }
+    return arrayOf(
+      "bmi" to r(b.BMI),
+      "fatPct" to r(b.bodyFatRate),
+      "musclePct" to r(b.muscleRate),
+      "muscleKg" to r(b.muscleMass),
+      "waterPct" to r(b.bodyWater),
+      "boneKg" to r(b.boneMass),
+      "bmr" to r(b.basalMetabolicRate),
+    )
+  }
+
   /** Ba'zi SDK metodlari (qon tahlili) inuker kutubxonasining `BleWriteResponse` ini kutadi. */
   private fun bleWriter(op: String): BleWriteResponse = BleWriteResponse { code ->
     if (code != Code.REQUEST_SUCCESS) {
@@ -899,9 +1112,19 @@ class WatchController(
           },
         )
 
+        // HRV va MET: S105 ularni ilovadan boshlashga ruxsat bermaydi (isSupportHrvAppDetect / isSupportMetAppDetect =
+        // false, SDK buyruqni yubormaydi), lekin soatning o'zida o'lchanganini xotiradan shu yerda o'qiymiz.
+        override fun onHrvManualDataChange(list: MutableList<HrvManualData>?) = emit(
+          "hrv",
+          (list ?: emptyList()).map { d -> mapOf("at" to d.timeStamp, "values" to (d.hrv?.toList() ?: emptyList())) },
+        )
+
+        override fun onMetoManualDataChange(list: MutableList<MetoManualData>?) = emit(
+          "met",
+          (list ?: emptyList()).map { d -> mapOf("at" to d.timeStamp, "value" to d.meto) },
+        )
+
         override fun onPressureManualDataChange(list: MutableList<PressureManualData>?) = Unit
-        override fun onMetoManualDataChange(list: MutableList<MetoManualData>?) = Unit
-        override fun onHrvManualDataChange(list: MutableList<HrvManualData>?) = Unit
         override fun onMiniCheckupManualDataChange(list: MutableList<MiniCheckupManualData>?) = Unit
         override fun onEmotionManualDataChange(list: MutableList<EmotionManualData>?) = Unit
         override fun onFatigueManualDataChange(list: MutableList<FatigueManualData>?) = Unit
@@ -1147,6 +1370,116 @@ class WatchController(
     emitData("notifySent", "variant" to kind.name, "title" to title, "body" to body)
   }
 
+  // ---------------------------------------------------------------- qo'ng'iroq (sinov bosqichi)
+  //
+  // SDK (AAR'dan): kiruvchi qo'ng'iroq — sendSocialMsgContent(ContentPhoneSetting(ESocailMsg.PHONE, ism, raqam));
+  // soatdagi tugmalar — settingPhoneListener(IPhoneListener: rejectPhone / cliencePhone (ovozsiz) / appAnswerCall);
+  // qo'ng'iroq tugadi yoki javob berildi — offhookOrIdlePhone (soat qo'ng'iroq ekranini yopadi).
+  // Hozircha haqiqiy qo'ng'iroqlar kuzatilmaydi (telefon ruxsatlarisiz): faqat soat nimani ko'rsatishi va
+  // tugmalari ilovaga yetib kelishi sinaladi.
+
+  @Volatile private var phoneListenerSet = false
+
+  private fun ensurePhoneListener() {
+    if (phoneListenerSet) return
+    // Soatdagi tugma: JS jurnaliga yoziladi va kalit yoqiq bo'lsa telefonda bajariladi (rad etish / ovozsiz / javob).
+    manager.settingPhoneListener(object : IPhoneListener {
+      override fun rejectPhone() {
+        emitData("phoneControl", "action" to "reject")
+        if (callBridge.enabled) callBridge.onWatchReject()
+      }
+
+      override fun cliencePhone() {
+        emitData("phoneControl", "action" to "silence")
+        if (callBridge.enabled) callBridge.onWatchSilence()
+      }
+
+      override fun appAnswerCall() {
+        emitData("phoneControl", "action" to "answer")
+        if (callBridge.enabled) callBridge.onWatchAnswer()
+      }
+    })
+    phoneListenerSet = true
+  }
+
+  /** "Soat" sahifasidagi kalit: haqiqiy qo'ng'iroqlarni soatga uzatish. Soatdagi qo'ng'iroq kalitini ham yoqadi. */
+  fun setCallForwarding(on: Boolean) = safe("setCallForwarding") {
+    callBridge.setEnabled(on)
+    if (on && ready) {
+      ensurePhoneListener()
+      val data = lastSocial ?: manager.functionSocailMsgData
+      if (data != null && data.phone != EFunctionStatus.SUPPORT_OPEN) {
+        data.phone = EFunctionStatus.SUPPORT_OPEN
+        manager.settingSocialMsg(writer("settingSocialMsg"), socialListener(), data)
+      }
+    }
+  }
+
+  /** Kalit holati va ruxsatlar (sinxron: sahifa ochilganda o'qiladi). */
+  fun callForwardStatus(): Map<String, Any?> = callBridge.status()
+
+  /** Soatdagi "qo'ng'iroq eslatmasi" kalitini yoqadi/o'chiradi. */
+  fun setCallNotifications(on: Boolean) = safe("setCallNotifications") {
+    if (!requireReady("setCallNotifications")) return@safe
+    val data = lastSocial ?: manager.functionSocailMsgData
+    if (data == null) {
+      emitData("error", "op" to "setCallNotifications", "message" to "Kalit holati hali o'qilmagan: avval readNotificationSwitches")
+      return@safe
+    }
+    data.phone = if (on) EFunctionStatus.SUPPORT_OPEN else EFunctionStatus.SUPPORT_CLOSE
+    manager.settingSocialMsg(writer("settingSocialMsg"), socialListener(), data)
+  }
+
+  /** Soatga "kiruvchi qo'ng'iroq" yuboradi (sinov: haqiqiy qo'ng'iroq yo'q). */
+  fun sendIncomingCall(name: String, number: String) = safe("sendIncomingCall") {
+    if (!requireReady("sendIncomingCall")) return@safe
+    ensurePhoneListener()
+    manager.sendSocialMsgContent(writer("sendIncomingCall"), ContentPhoneSetting(ESocailMsg.PHONE, name, number))
+    emitData("callSent", "name" to name, "number" to number)
+  }
+
+  /** Qo'ng'iroq tugadi / javob berildi: soat qo'ng'iroq ekranini yopishi kerak. */
+  fun endIncomingCall() = safe("endIncomingCall") {
+    if (!requireReady("endIncomingCall")) return@safe
+    manager.offhookOrIdlePhone(writer("offhookOrIdlePhone"))
+    emitData("callEnded")
+  }
+
+  // ---------------------------------------------------------------- faollik: qadam, kkal, masofa
+  //
+  // readSportStep → SportData(step, kcal, dis km): bugungi jami (soat yarim tundan hisoblaydi).
+  // syncPersonInfo → PersonInfoData(jins, bo'y sm, vazn kg, yosh, qadam maqsadi, uyqu maqsadi daq): soat kkal va
+  // masofani shundan hisoblaydi, maqsad halqasi ham shunga. SDK xatosi: uyqu maqsadi 0..1440 dan tashqarida bo'lsa,
+  // qadam maqsadini 480 ga buzadi — shuning uchun qiymatlar shu yerda chegaralanadi.
+
+  fun readSteps() = safe("readSteps") {
+    if (!requireReady("readSteps")) return@safe
+    manager.readSportStep(writer("readSportStep"), object : ISportDataListener {
+      override fun onSportDataChange(data: SportData?) {
+        if (data == null) return
+        emitData("sportStep", "step" to data.step, "kcal" to data.kcal, "dis" to data.dis)
+      }
+    })
+  }
+
+  fun syncPersonInfo(male: Boolean, heightCm: Int, weightKg: Int, age: Int, stepGoal: Int, sleepGoalMin: Int) =
+    safe("syncPersonInfo") {
+      if (!requireReady("syncPersonInfo")) return@safe
+      val info = PersonInfoData(
+        if (male) ESex.MAN else ESex.WOMEN,
+        heightCm.coerceIn(55, 255),
+        weightKg.coerceIn(25, 255),
+        age.coerceIn(1, 255),
+        stepGoal.coerceIn(1, 65535),
+        sleepGoalMin.coerceIn(0, 1440),
+      )
+      manager.syncPersonInfo(writer("syncPersonInfo"), object : IPersonInfoDataListener {
+        override fun OnPersoninfoDataChange(status: EOprateStauts?) {
+          emitData("personInfo", "status" to status?.name)
+        }
+      }, info)
+    }
+
   // ---------------------------------------------------------------- avto-o'lchash (7.5)
 
   private fun autoMeasureListener(): IAutoMeasureSettingDataListener = object : IAutoMeasureSettingDataListener {
@@ -1302,9 +1635,294 @@ class WatchController(
     manager.settingSpo2hAutoDetect(writer("settingSpo2hAutoDetect"), spo2NightListener(), setting)
   }
 
+  // ---------------------------------------------------------------- siferblatlar (soat siferblati do'koni)
+  //
+  // SDK hujjati, "Watch face function" → "Server watch face": 1) do'kon qo'llanadimi, 2) soatdan asosiy ma'lumot
+  // (UIDataServer), 3) Veepoo serveridan ro'yxat (TUiTheme: preview, fayl), 4) faylni yuklab olish, 5) soatga uzatish.
+  // Uzatish chip platformasiga bog'liq: oddiy soat — UiUpdateUtil.startSetUiStream; Jieli (isJLDevice) — avval Jieli
+  // xabarnomasi + MTU + autentifikatsiya, fayl tizimini ochish (listJLWatchList), so'ng setJLWatchDial.
+  // Hodisalar: "dialInfo", "dialMarket" {items | error}, "dialInstall" {stage: download|clear|transfer|done|error, progress}.
+  // Barcha klass/metod imzolari AAR bayt-kodidan tekshirilgan (hammasi Java klasslari).
+
+  private val dialExecutor = Executors.newSingleThreadExecutor()
+  private val mainHandler = Handler(Looper.getMainLooper())
+  @Volatile private var dialServerInfo: UIDataServer? = null
+  @Volatile private var dialBusy = false
+  @Volatile private var jlAuthed = false
+
+  /** Bizning ilova nomi va versiyasi: Veepoo serveri ro'yxatni shunga qarab beradi (`getThemeInfo`). */
+  private fun appIdentity(): Pair<String, String> {
+    val pkg = appContext.packageName
+    val version = try {
+      appContext.packageManager.getPackageInfo(pkg, 0).versionName ?: "1.0.0"
+    } catch (t: Throwable) {
+      "1.0.0"
+    }
+    return pkg to version
+  }
+
+  /** Soat siferblatlarni qanday qo'llashi (diagnostika va UI qarori uchun). */
+  fun readDialInfo() = safe("readDialInfo") {
+    if (!requireReady("readDialInfo")) return@safe
+    val sp = VpSpGetUtil.getVpSpVariInstance(appContext)
+    val (pkg, version) = appIdentity()
+    emitData(
+      "dialInfo",
+      "jl" to manager.isJLDevice(),
+      "screenStyle" to sp.isSupportScreenStyle(),
+      "serverUi" to UiUpdateUtil.getInstance().isSupportChangeServerUi(),
+      "bigTranType" to sp.getBigTranType(),
+      "serverCount" to sp.getWatchuiServer(),
+      "appPackage" to pkg,
+      "appVersion" to version,
+    )
+  }
+
+  /** Do'kon ro'yxati. `deviceNumber`/`deviceTestVersion` — ulanishdagi "pwd" hodisasidan (JS saqlaydi). */
+  fun loadDialMarket(deviceNumber: String, deviceTestVersion: String) = safe("loadDialMarket") {
+    if (!requireReady("loadDialMarket")) return@safe
+    val ui = UiUpdateUtil.getInstance()
+    if (!ui.isSupportChangeServerUi()) {
+      emitData("dialMarket", "error" to "UNSUPPORTED")
+      return@safe
+    }
+    ui.init(appContext)
+    ui.getServerWatchUiInfo(object : IUIBaseInfoFormServerListener {
+      override fun onBaseUiInfoFormServer(uiDataServer: UIDataServer?) {
+        val info = uiDataServer
+        if (info == null) {
+          emitData("dialMarket", "error" to "NO_INFO")
+          return
+        }
+        dialServerInfo = info
+        // getThemeInfo — tarmoq so'rovi: asosiy oqimda chaqirib bo'lmaydi (hujjat).
+        dialExecutor.execute {
+          try {
+            val (pkg, version) = appIdentity()
+            val raw: List<*> = UiServerHttpUtil().getThemeInfo(info, deviceNumber, deviceTestVersion, pkg, version)
+              ?: emptyList<Any>()
+            val items = raw.mapNotNull { it as? TUiTheme }.map { th ->
+              mapOf(
+                "crc" to th.crc,
+                "name" to th.name,
+                "previewUrl" to th.previewUrl,
+                "fileUrl" to th.fileUrl,
+                "shape" to th.dialShape,
+                "size" to th.fileLenght,
+                "available" to th.isAvailable,
+                "binProtocol" to th.binProtocol?.toString(),
+              )
+            }
+            // binDataType va shape: soat qaysi formatdagi faylni kutadi (diagnostika, siferblat binProtocol'i bilan solishtirish).
+            emitData(
+              "dialMarket",
+              "items" to items,
+              "currentCrc" to info.imgCrcId,
+              "shape" to info.deviceAialShape?.toString(),
+              "binDataType" to info.binDataType?.toString(),
+            )
+          } catch (t: Throwable) {
+            emitData("dialMarket", "error" to "NETWORK", "message" to (t.message ?: t.javaClass.simpleName))
+          }
+        }
+      }
+    })
+  }
+
+  private fun dialStage(stage: String, progress: Int = 0, vararg extra: Pair<String, Any?>) {
+    emitData("dialInstall", "stage" to stage, "progress" to progress, *extra)
+  }
+
+  private fun dialFail(error: String, message: String? = null) {
+    dialBusy = false
+    dialStage("error", 0, "error" to error, "message" to message)
+  }
+
+  /** Siferblatni yuklab olib soatga o'rnatadi. Batareya tekshiruvi JS'da (hujjat: past batareyada soat o'chib qolishi mumkin). */
+  fun installDial(fileUrl: String, crc: String) = safe("installDial") {
+    if (!requireReady("installDial")) return@safe
+    if (dialBusy) {
+      dialStage("error", 0, "error" to "BUSY")
+      return@safe
+    }
+    dialBusy = true
+    // Fayl serverdagi ASL NOMI bilan saqlanishi shart. Jieli faylni yuborishdan oldin telefonda tekshiradi
+    // (FatFileSystem/RcspWatch.isMatchVersion): siferblat fayli — arxiv, SDK uning ichidan "<fayl nomi>.json" ni
+    // qidiradi (WatchFileUtil.getJsonFileName). Nom o'zgartirilsa (avval "dial_<crc>.bin" edi) JSON topilmaydi va har
+    // qanday siferblat 16896 "File information does not match" bilan rad etiladi. Veepoo SDK nomni o'zi tiklamaydi.
+    // Har siferblat o'z papkasida: bir xil nomli fayllar bir-birini bosib ketmasin.
+    val key = crc.replace(Regex("[^A-Za-z0-9_-]"), "_")
+    val dir = File(File(appContext.cacheDir, "dials"), key).apply {
+      deleteRecursively()
+      mkdirs()
+    }
+    val file = File(dir, dialFileName(fileUrl, key))
+    dialStage("download", 0)
+    dialExecutor.execute {
+      try {
+        if (file.exists()) file.delete()
+        UiServerHttpUtil().downloadFile(
+          fileUrl,
+          file.absolutePath,
+          object : OnDownLoadListener {
+            override fun onProgress(progress: Float) {
+              dialStage("download", Math.round(progress * 100))
+            }
+
+            override fun onFinish() {
+              if (!file.exists() || file.length() == 0L) {
+                dialFail("DOWNLOAD")
+                return
+              }
+              mainHandler.post { transferDial(file) }
+            }
+          },
+        )
+      } catch (t: Throwable) {
+        dialFail("DOWNLOAD", t.message ?: t.javaClass.simpleName)
+      }
+    }
+  }
+
+  /** URL'ning oxirgi bo'lagi (so'rov va # qismisiz, dekodlangan): siferblatning serverdagi asl fayl nomi. */
+  private fun dialFileName(fileUrl: String, fallback: String): String {
+    val last = fileUrl.substringBefore('#').substringBefore('?').trimEnd('/').substringAfterLast('/')
+    val decoded = try {
+      java.net.URLDecoder.decode(last, "UTF-8")
+    } catch (t: Throwable) {
+      last
+    }
+    val name = decoded.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
+    return if (name.isEmpty() || name == "." || name == "..") "dial_$fallback" else name
+  }
+
+  private fun transferDial(file: File) {
+    if (!ready) return dialFail("NOT_READY")
+    if (manager.isJLDevice()) transferDialJL(file) else transferDialStream(file)
+  }
+
+  /** Oddiy (Jieli bo'lmagan) soat: avval asosiy ma'lumot o'qilgan bo'lishi kerak (aks holda NEED_READ_BASE_INFO). */
+  private fun transferDialStream(file: File) {
+    val ui = UiUpdateUtil.getInstance()
+    ui.init(appContext)
+    val send = {
+      try {
+        ui.startSetUiStream(EUIFromType.SERVER, FileInputStream(file), object : IUiUpdateListener {
+          override fun onUiUpdateStart() = dialStage("transfer", 0)
+          override fun onStartClearCache(sumCount: Int) = dialStage("clear", 0)
+          override fun onClearCacheProgress(currentCount: Int, sumCount: Int, progress: Int) = dialStage("clear", progress)
+          override fun onFinishClearCache() = dialStage("transfer", 0)
+          override fun onUiUpdateProgress(currentBlock: Int, sumBlock: Int, progress: Int) = dialStage("transfer", progress)
+
+          override fun onUiUpdateSuccess() {
+            dialBusy = false
+            dialStage("done", 100)
+          }
+
+          override fun onUiUpdateFail(eUiUpdateError: EUiUpdateError?) {
+            // Soatdagi siferblat bilan bir xil fayl: uzatish shart emas (hujjat), o'rnatilgan deb hisoblaymiz.
+            if (eUiUpdateError == EUiUpdateError.APP_CRC_SAME_DEVICE_CRC) {
+              dialBusy = false
+              dialStage("done", 100, "same" to true)
+              return
+            }
+            dialFail(eUiUpdateError?.name ?: "TRANSFER")
+          }
+        })
+      } catch (t: Throwable) {
+        dialFail("TRANSFER", t.message ?: t.javaClass.simpleName)
+      }
+    }
+    if (dialServerInfo != null) {
+      send()
+    } else {
+      ui.getServerWatchUiInfo(object : IUIBaseInfoFormServerListener {
+        override fun onBaseUiInfoFormServer(uiDataServer: UIDataServer?) {
+          dialServerInfo = uiDataServer
+          mainHandler.post { send() }
+        }
+      })
+    }
+  }
+
+  /** Jieli soat: xabarnoma + MTU + autentifikatsiya (ilova ishga tushgach bir marta), fayl tizimi, so'ng uzatish. */
+  private fun transferDialJL(file: File) {
+    ensureJLFileSystem { ok, message ->
+      if (!ok) return@ensureJLFileSystem dialFail("JL_PREPARE", message)
+      try {
+        manager.setJLWatchDial(file.absolutePath, object : JLWatchHolder.OnSetJLWatchDialListener {
+          override fun onStart() = dialStage("transfer", 0)
+          override fun onProgress(progress: Int) = dialStage("transfer", progress)
+
+          override fun onComplete(watchPath: String?) {
+            dialBusy = false
+            dialStage("done", 100, "path" to watchPath)
+          }
+
+          override fun onFiled(code: Int, errorMsg: String?) {
+            // 16896 (0x4200) — Jieli WatchError.ERR_VERSION_NOT_MATCH: fayl soat dasturiga mos emas (boshqa firmware uchun).
+            if (code == JL_ERR_VERSION_NOT_MATCH) dialFail("VERSION_MISMATCH", "$code")
+            else dialFail("JL_TRANSFER", "$code: ${errorMsg ?: ""}")
+          }
+        })
+      } catch (t: Throwable) {
+        dialFail("JL_TRANSFER", t.message ?: t.javaClass.simpleName)
+      }
+    }
+  }
+
+  private fun ensureJLFileSystem(next: (Boolean, String?) -> Unit) {
+    val openFileSystem = {
+      dialStage("prepare", 0)
+      manager.listJLWatchList(object : JLWatchFaceManager.OnWatchDialInfoGetListener {
+        override fun onGettingWatchDialInfo() = Unit
+        override fun onWatchDialInfoGetStart() = Unit
+        override fun onWatchDialInfoGetComplete() = Unit
+
+        override fun onWatchDialInfoGetSuccess(systemFatFiles: MutableList<FatFile>?, serverFatFiles: MutableList<FatFile>?, picFatFile: FatFile?) {
+          mainHandler.post { next(true, null) }
+        }
+
+        override fun onWatchDialInfoGetFailed(error: BaseError?) {
+          mainHandler.post { next(false, error?.message ?: "listJLWatchList") }
+        }
+      })
+    }
+    val authenticate = {
+      if (jlAuthed) {
+        openFileSystem()
+      } else {
+        manager.startJLDeviceAuth(object : RcspAuthResponse {
+          override fun onRcspAuthStart() = Unit
+
+          override fun onRcspAuthSuccess() {
+            jlAuthed = true
+            mainHandler.post { openFileSystem() }
+          }
+
+          override fun onRcspAuthFailed() {
+            mainHandler.post { next(false, "JL auth") }
+          }
+        })
+      }
+    }
+    if (manager.isJLNotifyOpened()) {
+      authenticate()
+    } else {
+      manager.openJLDataNotify(object : BleNotifyResponse {
+        override fun onNotify(service: UUID?, character: UUID?, value: ByteArray?) = Unit
+
+        override fun onResponse(code: Int) {
+          manager.changeMTU(247, IMtuChangeListener { mainHandler.post { authenticate() } })
+        }
+      })
+    }
+  }
+
   companion object {
     private const val DEFAULT_PASSWORD = "0000"
     private const val ECG_GAIN = 20 // EcgUtil kuchaytirishi (vendor demo qiymati)
+    private const val JL_ERR_VERSION_NOT_MATCH = 16896 // Jieli WatchError: "File information does not match"
     /** History sinxroni: JS'dagi tur nomi → SDK turi. */
     private val MANUAL_TYPES = mapOf(
       "bp" to DeviceManualDataType.BLOOD_PRESSURE,
@@ -1313,6 +1931,8 @@ class WatchController(
       "temp" to DeviceManualDataType.BODY_TEMPERATURE,
       "glucose" to DeviceManualDataType.BLOOD_GLUCOSE,
       "blood" to DeviceManualDataType.BLOOD_COMPOSITION,
+      "hrv" to DeviceManualDataType.HRV,
+      "met" to DeviceManualDataType.MET,
     )
 
     @Volatile private var sdkInitialized = false

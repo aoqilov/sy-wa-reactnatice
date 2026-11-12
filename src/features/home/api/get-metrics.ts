@@ -13,7 +13,10 @@ export type MetricKey =
   | "temperature"
   | "ecg"
   | "blood"
-  | "sugar";
+  | "sugar"
+  | "hrv"
+  | "stress"
+  | "bodyComp";
 
 export type Metric = {
   key: MetricKey;
@@ -55,6 +58,18 @@ const METRICS: MetricInfo[] = [
     normalRange: "Xolesterin < 5.2, triglitseridlar < 1.7, HDL > 1.0, LDL < 3.4 mmol/l; siydik kislotasi 150-420 µmol/l",
   },
   { key: "sugar", title: "Shakar", icon: "sparkle", unit: "mmol/l", normalRange: "3.9-5.6 mmol/l (och qoringa)" },
+  // Yurak urishlari orasidagi vaqt o'zgaruvchanligi: yoshga va odamga qarab juda farq qiladi.
+  { key: "hrv", title: "HRV", icon: "heart-fill", unit: "ms", normalRange: "Odatda 20-100 ms (yoshga bog'liq, yuqori yaxshi)" },
+  // Soatning stress indeksi (0..100), optik datchik bo'yicha.
+  { key: "stress", title: "Stress", icon: "smiley", unit: "/ 100", normalRange: "0-50: me'yorda, 50 dan yuqori: ko'tarilgan" },
+  // Tana tarkibi elektrod orqali (bioimpedans), taxminiy. Qiymat — yog' ulushi; qolganlari natija qatorida.
+  {
+    key: "bodyComp",
+    title: "Tana tarkibi",
+    icon: "person",
+    unit: "% yog'",
+    normalRange: "Yog' ulushi: erkaklar ~10-20 %, ayollar ~18-28 % (taxminiy)",
+  },
 ];
 
 function blank(info: MetricInfo): Metric {

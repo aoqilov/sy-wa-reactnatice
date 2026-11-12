@@ -1,4 +1,4 @@
-import type { BloodParts, RawReading } from "@/shared/watch/measure";
+import type { BloodParts, BodyParts, RawReading } from "@/shared/watch/measure";
 import { getJSON, setJSON } from "@/shared/storage/storage";
 
 import type { Metric, MetricKey, MetricStatus } from "../api/get-metrics";
@@ -15,6 +15,8 @@ export type StoredReading = {
   at: number; // ms
   /** Qon tahlili: beshta qiymat birga (natija kartasida hammasi bitta joyda ko'rinadi). */
   blood?: BloodParts;
+  /** Tana tarkibi: hamma qiymatlar (kartadagi qiymat — yog' ulushi). */
+  body?: BodyParts;
 };
 
 const STORAGE_KEY = "readings.v1";
@@ -87,6 +89,23 @@ function gradeSugar(v: number): Grade {
   return { status: "danger", label: "Yuqori" };
 }
 
+// HRV: yuqori bo'lsa yaxshi; juda past qiymat charchoq yoki stress belgisi bo'lishi mumkin. Me'yor yoshga bog'liq,
+// shuning uchun faqat aniq past qiymat belgilanadi.
+function gradeHrv(v: number): Grade {
+  return v < 20 ? { status: "warning", label: "Past" } : NORMAL;
+}
+
+// Stress indeksi 0..100 (soatning o'z shkalasi).
+function gradeStress(v: number): Grade {
+  if (v <= 25) return { status: "normal", label: "Bo'shashgan" };
+  if (v <= 50) return NORMAL;
+  if (v <= 75) return { status: "warning", label: "O'rtacha" };
+  return { status: "danger", label: "Yuqori" };
+}
+
+// Tana tarkibi: SDK me'yor bermaydi, qiymat taxminiy: holat "normal", yorliqda "taxminiy".
+const ESTIMATE: Grade = { status: "normal", label: "Taxminiy" };
+
 const SUGAR_RISK: Record<string, string> = { LOW: "soat: past xavf", MIDDLE: "soat: o'rta xavf", HIGH: "soat: yuqori xavf" };
 
 function gradePressure(sys: number, dia: number): Grade {
@@ -117,6 +136,12 @@ export function statusFor(key: MetricKey, nums: number[]): MetricStatus {
       return gradePressure(a, b).status;
     case "blood":
       return "normal";
+    case "hrv":
+      return gradeHrv(a).status;
+    case "stress":
+      return gradeStress(a).status;
+    case "bodyComp":
+      return ESTIMATE.status;
   }
 }
 
@@ -147,6 +172,26 @@ export function toStoredReading(raw: RawReading, at = Date.now()): StoredReading
     case "pressurePump": {
       const g = gradePressure(raw.sys, raw.dia);
       return { key: raw.key, value: `${raw.sys}/${raw.dia}`, status: g.status, statusLabel: g.label, at };
+    }
+    case "hrv": {
+      const g = gradeHrv(raw.value);
+      return { key: raw.key, value: String(Math.round(raw.value)), status: g.status, statusLabel: g.label, at };
+    }
+    case "stress": {
+      const g = gradeStress(raw.value);
+      return { key: raw.key, value: String(Math.round(raw.value)), status: g.status, statusLabel: g.label, at };
+    }
+    case "bodyComp": {
+      const b = raw.body;
+      const extras = [b.muscleKg !== undefined && `mushak ${b.muscleKg} kg`, b.waterPct !== undefined && `suv ${b.waterPct} %`];
+      return {
+        key: raw.key,
+        value: b.fatPct.toFixed(1),
+        status: ESTIMATE.status,
+        statusLabel: [`BMI ${b.bmi}`, ...extras.filter(Boolean), "taxminiy"].join(" · "),
+        at,
+        body: b,
+      };
     }
     case "ecg": {
       // Qiymat — EKG paytidagi puls. Ritm tahlili (kasallik belgilari) Veepoo'ning pullik funksiyasi, shuning uchun

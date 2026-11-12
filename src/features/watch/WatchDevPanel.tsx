@@ -141,6 +141,18 @@ function WatchDevPanelInner({ watch }: { watch: WatchModule }) {
       </View>
 
       <CusText variant="heading" className="mt-2">
+        {"Qo'ng'iroq (sinov)"}
+      </CusText>
+      <CusText variant="caption" tone="muted">
+        {"Avval “Kalitlarni o'qish”, so'ng “Qo'ng'iroq kaliti yoq”. Soatdagi Rad etish / Ovozsiz tugmalari jurnalda “phoneControl” bo'lib chiqadi."}
+      </CusText>
+      <View className="flex-row flex-wrap gap-2">
+        <CusButton title="Qo'ng'iroq kaliti yoq" size="sm" variant="outline" disabled={!ready} onPress={() => run("setCallNotifications(true)", () => VeepooWatch.setCallNotifications(true))} />
+        <CusButton title="Test: kiruvchi qo'ng'iroq" size="sm" disabled={!ready} onPress={() => run("sendIncomingCall", () => VeepooWatch.sendIncomingCall("Synapse Test", "+998901234567"))} />
+        <CusButton title="Qo'ng'iroq tugadi" size="sm" variant="outline" disabled={!ready} onPress={() => run("endIncomingCall", () => VeepooWatch.endIncomingCall())} />
+      </View>
+
+      <CusText variant="heading" className="mt-2">
         {"Avto-o'lchash"}
       </CusText>
       <View className="flex-row flex-wrap gap-2">

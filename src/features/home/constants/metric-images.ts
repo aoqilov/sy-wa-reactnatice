@@ -2,7 +2,8 @@ import type { MetricKey } from "../api/get-metrics";
 
 // Kartalarning fon rasmlari (assets/images/metrics/). Manbasi: CREDITS.md.
 // require() natijasi raqam (asset ID) bo'ladi. Yo'li statik bo'lishi shart, shuning uchun har biri alohida yozilgan.
-export const METRIC_IMAGES: Record<MetricKey, number> = {
+// Rasm faqat bor o'lchovlar uchun (HRV, stress, tana tarkibida yo'q: o'rniga rangli belgi chiqadi).
+export const METRIC_IMAGES: Partial<Record<MetricKey, number>> = {
   pulse: require("../../../../assets/images/metrics/pulse.jpg"),
   pressurePump: require("../../../../assets/images/metrics/pressurePump.jpg"),
   oxygen: require("../../../../assets/images/metrics/oxygen.jpg"),

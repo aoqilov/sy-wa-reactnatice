@@ -37,6 +37,20 @@ export type VeepooWatchEvents = {
 /** Bildirishnoma varianti: "custom" = ESocailMsg.APP_CUSTOM_MSG, "other" = ESocailMsg.OTHER. */
 export type NotifyVariant = 'custom' | 'other';
 
+/** Qo'ng'iroqlarni soatga uzatish: kalit, kuzatuv va telefon ruxsatlari. */
+export type CallForwardStatus = {
+  enabled: boolean;
+  /** Telefon holati kuzatilyapti (ilova jarayoni tirik). */
+  listening: boolean;
+  phoneState: boolean;
+  /** Android 9+: raqam faqat shu ruxsat bilan keladi. */
+  callLog: boolean;
+  /** Kontakt nomi. */
+  contacts: boolean;
+  /** Soatdan rad etish / javob berish. */
+  answerCalls: boolean;
+};
+
 /** Android `EAutoMeasureType.value`. */
 export const AutoMeasureType = {
   PulseRate: 0,

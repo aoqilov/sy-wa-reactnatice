@@ -1,4 +1,5 @@
 import Octicons from "@expo/vector-icons/Octicons";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 
@@ -16,6 +17,7 @@ import { missingNativeFunctions } from "@/shared/watch/measure";
 import { FEATURE_KEYS, isAutoMeasureSupported, type WatchFeatureKey } from "@/shared/watch/watch-info";
 import { BatteryIndicator } from "@/widgets/app-header/battery-indicator";
 
+import { CallForwardCard } from "./components/call-forward-card";
 import { WatchDevPanel } from "./WatchDevPanel";
 
 // Header bosilganda ochiladigan sahifa: ulangan soat haqida ma'lumot (model, batareya, versiya, imkoniyatlar,
@@ -115,6 +117,23 @@ export function FeatureWatch() {
           />
         </View>
       </CusCard>
+
+      {/* Soatga siferblat qo'yish: do'kondan tanlash va o'rnatish (/watch/dials) */}
+      <CusCard className="gap-3">
+        <View className="flex-row items-center gap-3">
+          <View className="h-10 w-10 items-center justify-center rounded-xl bg-primary-soft">
+            <Octicons name="apps" size={20} color={primary} />
+          </View>
+          <CusText variant="heading" className="flex-1">
+            {t("watchInfo.dials.title")}
+          </CusText>
+        </View>
+        <CusText tone="muted">{t("watchInfo.dials.desc")}</CusText>
+        <CusButton title={t("watchInfo.dials.open")} disabled={!ready} onPress={() => router.push("/watch/dials")} />
+      </CusCard>
+
+      {/* Telefon qo'ng'iroqlarini soatga uzatish (kalit) */}
+      <CallForwardCard connected={ready} />
 
       {/* Versiya va imkoniyatlar soatdan ulanish paytida keladi: soat avval ulangan bo'lsa, qayta ulash kerak */}
       {ready && info.firmware === null ? (

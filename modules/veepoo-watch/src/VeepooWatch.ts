@@ -1,6 +1,6 @@
 import { NativeModule, requireOptionalNativeModule } from 'expo';
 
-import type { ConnectionEvent, NotifyVariant, VeepooWatchEvents } from './VeepooWatch.types';
+import type { CallForwardStatus, ConnectionEvent, NotifyVariant, VeepooWatchEvents } from './VeepooWatch.types';
 
 declare class VeepooWatchModule extends NativeModule<VeepooWatchEvents> {
   /** Native qismdagi joriy ulanish holati (JS qayta yuklangandan keyin holatni tiklash uchun). */
@@ -37,6 +37,21 @@ declare class VeepooWatchModule extends NativeModule<VeepooWatchEvents> {
    */
   startBloodComponent(): void;
   stopBloodComponent(): void;
+  /** HRV (ms). Hodisalar: "hrv" {value}, "hrvError" {state}, "hrvStop". */
+  startHrv(): void;
+  stopHrv(): void;
+  /** Stress 0..100. Hodisalar: "stress" {progress}, "stressDone" {value}, "stressError" {state}, "stressStop". */
+  startStress(): void;
+  stopStress(): void;
+  /** MET. Hodisalar: "met" {progress, value}, "metError" {state}, "metStop". */
+  startMet(): void;
+  stopMet(): void;
+  /**
+   * Tana tarkibi (elektrod orqali). Hodisalar: "body" {progress, lead (0 — barmoq tegib turibdi)},
+   * "bodyDone" {bmi, fatPct, musclePct, muscleKg, waterPct, boneKg, bmr}, "bodyError" {state}, "bodyStop".
+   */
+  startBodyComp(): void;
+  stopBodyComp(): void;
   startCuffBp(rawFlag: boolean): void;
   stopCuffBp(): void;
   /** Soatning o'zida o'lchangan bosim yozuvlarini o'qish: natija "manualBp" hodisasi bilan keladi. `sinceSec` — epoch soniya. */
@@ -63,9 +78,41 @@ declare class VeepooWatchModule extends NativeModule<VeepooWatchEvents> {
   setOtherNotifications(on: boolean): void;
   sendNotification(title: string, body: string, variant: NotifyVariant): void;
 
+  /** Soatdagi "qo'ng'iroq eslatmasi" kaliti. Javob "socialSwitch" hodisasida (`phone`). */
+  setCallNotifications(on: boolean): void;
+  /**
+   * Soatga kiruvchi qo'ng'iroqni ko'rsatadi (sinov). Hodisalar: "callSent"; soatdagi tugmalar —
+   * "phoneControl" {action: "reject" | "silence" | "answer"}.
+   */
+  sendIncomingCall(name: string, number: string): void;
+  /** Qo'ng'iroq tugadi / javob berildi: soat qo'ng'iroq ekranini yopadi. Hodisa "callEnded". */
+  endIncomingCall(): void;
+
+  /**
+   * Haqiqiy qo'ng'iroqlarni soatga uzatish (kalit saqlanadi, ilova qayta ochilganda ham yoqiq qoladi).
+   * Ruxsatlarni JS oldindan so'raydi. Hodisalar: "callForward" (holat), "callIncoming", "callAction" {action, ok}.
+   */
+  setCallForwarding(on: boolean): void;
+  getCallForwardStatus(): CallForwardStatus;
+
+  /** Bugungi jami. Hodisa "sportStep" {step, kcal, dis (km)}. */
+  readSteps(): void;
+  /** Soatga shaxsiy ma'lumot va maqsadlar (kkal/masofa hisobi, maqsad halqasi). Hodisa "personInfo" {status}. */
+  syncPersonInfo(male: boolean, heightCm: number, weightKg: number, age: number, stepGoal: number, sleepGoalMin: number): void;
+
   readAutoMeasure(): void;
   /** `startMin`/`endMin` manfiy bo'lsa soatdagi joriy oraliq saqlanadi. */
   setAutoMeasure(typeValue: number, on: boolean, intervalMin: number, startMin: number, endMin: number): void;
+
+  /** Soat siferblatlarni qanday qo'llashi. Hodisa "dialInfo" {jl, screenStyle, serverUi, bigTranType, serverCount, appPackage, appVersion}. */
+  readDialInfo(): void;
+  /**
+   * Siferblat do'koni ro'yxati (Veepoo serveri). Hodisa "dialMarket": `{items: [{crc, name, previewUrl, fileUrl, shape,
+   * size, available}], currentCrc, shape}` yoki `{error: UNSUPPORTED | NO_INFO | NETWORK, message}`.
+   */
+  loadDialMarket(deviceNumber: string, deviceTestVersion: string): void;
+  /** Yuklab olib soatga o'rnatadi. Hodisa "dialInstall" {stage: download | prepare | clear | transfer | done | error, progress, error?}. */
+  installDial(fileUrl: string, crc: string): void;
 
   /**
    * Avto-o'lchash kalitlari (intervalsiz): S105/E500 intervalli `readAutoMeasure` ni qo'llamaydi, lekin shu kalitlarni biladi.

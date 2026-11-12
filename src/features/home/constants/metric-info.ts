@@ -78,4 +78,34 @@ export const METRIC_INFO: Record<MetricKey, MetricInfo> = {
       "Ko'rsatkich doimiy 7 mmol/l dan yuqori bo'lsa, shifokorga murojaat qiling.",
     ],
   },
+  hrv: {
+    about:
+      "HRV (yurak ritmi o'zgaruvchanligi) — yurak urishlari orasidagi vaqtning qanchalik o'zgarib turishi, millisekundda. Odatda yuqori HRV dam olgan, tiklangan holatni bildiradi. Me'yor yoshga va odamga qarab ancha farq qiladi.",
+    how: "Soat optik datchik bilan yurak urishlarini sezadi va ular orasidagi vaqt farqlarini hisoblaydi. O'lchash taxminan bir daqiqa davom etadi.",
+    tips: [
+      "Tinch o'tirib, har kuni bir xil vaqtda (masalan ertalab) o'lchang.",
+      "Bitta natijaga emas, kunlar bo'yicha o'zgarishga qarang.",
+      "Kam uyqu, kasallik, spirtli ichimlik va stress HRV ni pasaytiradi.",
+    ],
+  },
+  stress: {
+    about:
+      "Stress indeksi — soatning 0 dan 100 gacha bo'lgan bahosi: qanchalik yuqori bo'lsa, organizm shunchalik zo'riqqan. Bu soatning o'z shkalasi, tibbiy o'lchov emas.",
+    how: "Soat yurak urishi va uning o'zgaruvchanligi asosida (optik datchik) stress darajasini baholaydi.",
+    tips: [
+      "O'lchashdan oldin bir necha daqiqa tinch o'tiring.",
+      "Jismoniy yuklama, kofe va kasallik natijani oshirishi mumkin.",
+      "Doimiy yuqori bo'lsa, dam olish va uyqu tartibiga e'tibor bering.",
+    ],
+  },
+  bodyComp: {
+    about:
+      "Tana tarkibi — tanadagi yog', mushak, suv va suyak ulushi. Kartadagi asosiy qiymat — yog' ulushi (%). Natija taxminiy, tibbiy tashxis emas.",
+    how: "Soat elektrodlar orqali tanadan juda kuchsiz tok o'tkazadi va qarshilikni o'lchaydi (bioimpedans). Buning uchun boshqa qo'l barmog'i soatning metall qismiga tegib turishi kerak. Hisob bo'y, vazn, yosh va jinsga tayanadi.",
+    tips: [
+      "Ovqat, ko'p suv ichish va mashqdan keyin darhol o'lchamang: natija o'zgaradi.",
+      "Har safar bir xil vaqtda o'lchang.",
+      "Yurak stimulyatori (pacemaker) yoki boshqa implant bo'lsa, o'lchamang va shifokor bilan maslahatlashing.",
+    ],
+  },
 };

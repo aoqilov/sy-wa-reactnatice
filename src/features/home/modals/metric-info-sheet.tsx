@@ -5,6 +5,7 @@ import { CusBottomSheet, CusCard, CusImage, CusText } from "@/components/ui";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 
 import { Metric } from "../api/get-metrics";
+import { METRIC_COLORS, withAlpha } from "../constants/metric-colors";
 import { METRIC_IMAGES } from "../constants/metric-images";
 import { METRIC_INFO } from "../constants/metric-info";
 
@@ -27,21 +28,30 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function MetricInfoSheet({ metric, visible, onClose }: Props) {
   const primary = useThemeColor("primary", "#1E6FEB");
   const info = METRIC_INFO[metric.key];
+  const image = METRIC_IMAGES[metric.key];
 
   return (
     <CusBottomSheet visible={visible} onClose={onClose} initialSnap="full" closeButton title={`${metric.title} haqida`}>
-      {/* Tepada o'lchov rasmi, pastki chap burchagida ikon */}
+      {/* Tepada o'lchov rasmi, pastki chap burchagida ikon. Rasmi yo'q o'lchovda: o'z rangidagi fon va katta belgi. */}
       <View style={{ height: 180, borderRadius: 16, overflow: "hidden" }}>
-        <CusImage
-          source={METRIC_IMAGES[metric.key]}
-          style={{ width: "100%", height: "100%" }}
-        />
-        <View
-          className="items-center justify-center rounded-full bg-surface"
-          style={{ position: "absolute", left: 12, bottom: 12, width: 40, height: 40 }}
-        >
-          <Octicons name={metric.icon} size={20} color={primary} />
-        </View>
+        {image !== undefined ? (
+          <>
+            <CusImage source={image} style={{ width: "100%", height: "100%" }} />
+            <View
+              className="items-center justify-center rounded-full bg-surface"
+              style={{ position: "absolute", left: 12, bottom: 12, width: 40, height: 40 }}
+            >
+              <Octicons name={metric.icon} size={20} color={primary} />
+            </View>
+          </>
+        ) : (
+          <View
+            className="flex-1 items-center justify-center"
+            style={{ backgroundColor: withAlpha(METRIC_COLORS[metric.key], 0.14) }}
+          >
+            <Octicons name={metric.icon} size={64} color={METRIC_COLORS[metric.key]} />
+          </View>
+        )}
       </View>
 
       <Section title="Bu nima?">

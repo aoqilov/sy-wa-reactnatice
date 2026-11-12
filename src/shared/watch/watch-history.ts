@@ -9,12 +9,12 @@ import { logWatch } from "./watch-log";
 // so'rovda bir necha turni o'qiydi (`readDeviceManualData`, native `readManualData`). Natija telefonga saqlanadi:
 // History soat ulanmagan paytda ham ochiladi, sinxron esa faqat yangisini qo'shadi.
 
-export type WatchRecordKind = "bp" | "hr" | "spo2" | "temp" | "glucose" | "blood";
+export type WatchRecordKind = "bp" | "hr" | "spo2" | "temp" | "glucose" | "blood" | "hrv";
 
 /** `auto` — soat "Rejam" jadvali bo'yicha o'zi o'lchagan (kunlik 5 daqiqalik ma'lumotdan). */
 export type WatchRecord = (
   | { kind: "bp"; at: number; sys: number; dia: number; hr?: number }
-  | { kind: "hr" | "spo2" | "temp"; at: number; value: number }
+  | { kind: "hr" | "spo2" | "temp" | "hrv"; at: number; value: number }
   | { kind: "glucose"; at: number; value: number; risk?: GlucoseRisk }
   | { kind: "blood"; at: number; parts: BloodParts }
 ) & { auto?: boolean };
@@ -23,7 +23,7 @@ export type SyncResult = { ok: true; added: number } | { ok: false; reason: Sync
 /** notReady — soat ulanmagan; busy — o'lchov ketyapti; outdated — eski APK; noReply / failed — soat javob bermadi. */
 export type SyncFailure = "notReady" | "busy" | "outdated" | "noReply" | "failed";
 
-const KINDS: WatchRecordKind[] = ["bp", "hr", "spo2", "temp", "glucose", "blood"];
+const KINDS: WatchRecordKind[] = ["bp", "hr", "spo2", "temp", "glucose", "blood", "hrv"];
 const RECORDS_KEY = "watchHistory.v1";
 const SYNCED_AT_KEY = "watchHistory.syncedAt";
 const KEEP_DAYS = 30;
@@ -94,6 +94,11 @@ function toRecord(kind: WatchRecordKind, r: Record<string, unknown>): WatchRecor
         return undefined;
       }
       return { kind, at, parts: { uricAcid, tcho, tag, hdl, ldl } };
+    }
+    case "hrv": {
+      // Soat bitta o'lchovda bir nechta qiymat (ms) yuboradi: medianasi.
+      const values = (Array.isArray(r.values) ? r.values : []).map(num).filter((v): v is number => v !== undefined && v >= 5 && v <= 300);
+      return values.length ? { kind, at, value: median(values) } : undefined;
     }
   }
 }

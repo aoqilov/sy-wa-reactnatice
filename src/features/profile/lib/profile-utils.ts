@@ -16,6 +16,20 @@ export function calcAge(birthYear: number, now = new Date()) {
   return now.getFullYear() - birthYear;
 }
 
+/** Tana massasi indeksi: vazn (kg) / bo'y (m)². Bir xonali kasr bilan. */
+export function calcBmi(heightCm: number, weightKg: number) {
+  const m = heightCm / 100;
+  return Math.round((weightKg / (m * m)) * 10) / 10;
+}
+
+/** JSST (WHO) kattalar uchun toifalari: < 18.5, 18.5–24.9, 25–29.9, ≥ 30. */
+export function bmiCategoryKey(bmi: number): TranslationKey {
+  if (bmi < 18.5) return "profile.bmi.under";
+  if (bmi < 25) return "profile.bmi.normal";
+  if (bmi < 30) return "profile.bmi.over";
+  return "profile.bmi.obese";
+}
+
 export type ProfileFormValues = {
   firstName: string;
   lastName: string;

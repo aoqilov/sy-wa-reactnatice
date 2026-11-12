@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { CusButton, CusScrollView, CusText } from "@/components/ui";
+import { ActivityCard } from "@/features/activity";
 import { EcgLiveStrip } from "@/features/ecg";
 import { useT } from "@/shared/i18n/use-t";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
@@ -133,6 +134,11 @@ function HomeContent({
         </View>
 
         <CusScrollView className="flex-1" contentContainerStyle={{ paddingBottom: tabBarSpace }}>
+          {/* Bugungi faollik: qadam halqasi, kkal, masofa (soatdan) */}
+          <View className="px-4 pt-2">
+            <ActivityCard />
+          </View>
+
           {/* Qon tahlili: beshta ko'rsatkich (lipidlar, siydik kislotasi) hammasi bitta kartada */}
           {current.key === "blood" && current.blood && !measuring ? (
             <View className="px-4 pt-2">

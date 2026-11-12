@@ -42,6 +42,9 @@ export const DECIMALS: Record<MetricKey, number> = {
   ecg: 0,
   blood: 0,
   sugar: 1,
+  hrv: 0,
+  stress: 0,
+  bodyComp: 1,
 };
 
 export const statusOf = statusFor;
@@ -91,6 +94,8 @@ function fromWatch(r: WatchRecord): HistoryReading {
       return reading("temperature", [r.value]);
     case "glucose":
       return reading("sugar", [r.value], r.risk ? RISK[r.risk] : undefined);
+    case "hrv":
+      return reading("hrv", [r.value]);
     case "blood": {
       const s = bloodSummary(r.parts);
       return {

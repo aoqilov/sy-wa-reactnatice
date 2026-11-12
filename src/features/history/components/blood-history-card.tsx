@@ -4,8 +4,8 @@ import { LayoutAnimation, Pressable, View } from "react-native";
 
 import { CusBadge, CusCard, CusText } from "@/components/ui";
 import { type BloodPartKey, bloodRows, bloodSummary, formatBlood } from "@/features/home/lib/blood";
+import { METRIC_COLORS, withAlpha } from "@/features/home/constants/metric-colors";
 import type { BloodParts } from "@/shared/watch/measure";
-import { useThemeColor } from "@/shared/theme/use-theme-color";
 
 import { type HistoryReading, SOURCE_LABEL } from "../api/get-history";
 import type { Summary } from "../lib/summarize";
@@ -29,7 +29,7 @@ type Props = { summary: Summary; now: Date };
 // Qon tahlili tarixi: beshta ko'rsatkich — beshta accordion qatori. Yopiq qatorda davr bo'yicha o'rtacha qiymat,
 // min/maks va holat; ochilganda shu ko'rsatkichning har bir o'lchovi (vaqti, manbasi, qiymati).
 export function BloodHistoryCard({ summary: s, now }: Props) {
-  const primary = useThemeColor("primary", "#1E6FEB");
+  const color = METRIC_COLORS[s.meta.key]; // Home kartasidagi shu o'lchov rangi
   const readings = s.readings.filter((r): r is HistoryReading & { blood: BloodParts } => r.blood !== undefined);
   const [open, setOpen] = useState<BloodPartKey | null>(null);
 
@@ -54,8 +54,8 @@ export function BloodHistoryCard({ summary: s, now }: Props) {
   return (
     <CusCard className={`gap-3 ${readings.length === 0 ? "opacity-60" : ""}`}>
       <View className="flex-row items-center gap-2">
-        <View className="h-8 w-8 items-center justify-center rounded-lg bg-primary-soft">
-          <Octicons name={s.meta.icon} size={16} color={primary} />
+        <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: withAlpha(color, 0.18) }}>
+          <Octicons name={s.meta.icon} size={16} color={color} />
         </View>
         <CusText variant="heading" className="flex-1" numberOfLines={1}>
           {s.meta.title}

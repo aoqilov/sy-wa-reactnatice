@@ -3,6 +3,7 @@ import { View } from "react-native";
 
 import { CusBadge, CusCard, CusText } from "@/components/ui";
 import type { MetricStatus } from "@/features/home/api/get-metrics";
+import { METRIC_COLORS, withAlpha } from "@/features/home/constants/metric-colors";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 
 import { Summary } from "../lib/summarize";
@@ -22,7 +23,7 @@ type Props = {
 
 // Bitta o'lchov bo'yicha davr xulosasi: o'rtacha qiymat, oralig'i, grafik va o'lchovlar soni.
 export function HistoryCard({ summary: s, highlighted = false, onPress }: Props) {
-  const primary = useThemeColor("primary", "#1E6FEB");
+  const color = METRIC_COLORS[s.meta.key]; // Home kartasidagi shu o'lchov rangi
   const muted = useThemeColor("muted", "#6B7385");
   const empty = s.count === 0;
 
@@ -32,8 +33,8 @@ export function HistoryCard({ summary: s, highlighted = false, onPress }: Props)
       className={`gap-3 ${empty ? "opacity-60" : ""} ${highlighted ? "border-primary" : ""}`}
     >
       <View className="flex-row items-center gap-2">
-        <View className="h-8 w-8 items-center justify-center rounded-lg bg-primary-soft">
-          <Octicons name={s.meta.icon} size={16} color={primary} />
+        <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: withAlpha(color, 0.18) }}>
+          <Octicons name={s.meta.icon} size={16} color={color} />
         </View>
         <CusText variant="heading" className="flex-1" numberOfLines={1}>
           {s.meta.title}

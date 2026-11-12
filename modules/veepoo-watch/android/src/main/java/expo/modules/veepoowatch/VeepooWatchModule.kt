@@ -100,6 +100,14 @@ class VeepooWatchModule : Module() {
     Function("stopGlucose") { controller().stopGlucose() }
     Function("startBloodComponent") { controller().startBloodComponent() }
     Function("stopBloodComponent") { controller().stopBloodComponent() }
+    Function("startHrv") { controller().startHrv() }
+    Function("stopHrv") { controller().stopHrv() }
+    Function("startStress") { controller().startStress() }
+    Function("stopStress") { controller().stopStress() }
+    Function("startMet") { controller().startMet() }
+    Function("stopMet") { controller().stopMet() }
+    Function("startBodyComp") { controller().startBodyComp() }
+    Function("stopBodyComp") { controller().stopBodyComp() }
     Function("startCuffBp") { rawFlag: Boolean -> controller().startCuffBp(rawFlag) }
     Function("stopCuffBp") { controller().stopCuffBp() }
     Function("readManualBp") { sinceSec: Int -> controller().readManualBp(sinceSec) }
@@ -121,11 +129,32 @@ class VeepooWatchModule : Module() {
       controller().sendNotification(title, body, variant)
     }
 
+    // Qo'ng'iroq (sinov bosqichi)
+    Function("setCallNotifications") { on: Boolean -> controller().setCallNotifications(on) }
+    Function("sendIncomingCall") { name: String, number: String -> controller().sendIncomingCall(name, number) }
+    Function("endIncomingCall") { controller().endIncomingCall() }
+    // Faollik: bugungi qadam/kkal/masofa va soatga shaxsiy ma'lumot + maqsadlar
+    Function("readSteps") { controller().readSteps() }
+    Function("syncPersonInfo") { male: Boolean, heightCm: Int, weightKg: Int, age: Int, stepGoal: Int, sleepGoalMin: Int ->
+      controller().syncPersonInfo(male, heightCm, weightKg, age, stepGoal, sleepGoalMin)
+    }
+
+    // Haqiqiy qo'ng'iroqlarni soatga uzatish ("Soat" sahifasidagi kalit)
+    Function("setCallForwarding") { on: Boolean -> controller().setCallForwarding(on) }
+    Function("getCallForwardStatus") { controller().callForwardStatus() }
+
     // Avto-o'lchash ("Mening rejam")
     Function("readAutoMeasure") { controller().readAutoMeasure() }
     Function("setAutoMeasure") { typeValue: Int, on: Boolean, intervalMin: Int, startMin: Int, endMin: Int ->
       controller().setAutoMeasure(typeValue, on, intervalMin, startMin, endMin)
     }
+
+    // Siferblatlar (soat siferblati do'koni)
+    Function("readDialInfo") { controller().readDialInfo() }
+    Function("loadDialMarket") { deviceNumber: String, deviceTestVersion: String ->
+      controller().loadDialMarket(deviceNumber, deviceTestVersion)
+    }
+    Function("installDial") { fileUrl: String, crc: String -> controller().installDial(fileUrl, crc) }
 
     // Avto-o'lchash kalitlari (intervalsiz; S105/E500 shuni qo'llaydi)
     Function("readAutoSwitches") { controller().readAutoSwitches() }

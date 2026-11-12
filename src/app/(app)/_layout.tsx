@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useWatchPersonSync } from "@/features/activity";
 import { startRoutineRunner } from "@/features/myplan/lib/routine-runner";
 import { AppHeader } from "@/widgets/app-header/AppHeader";
 import { AppTabs } from "@/widgets/app-tabs/AppTabs";
@@ -14,6 +15,8 @@ export default function AppLayout() {
 
   // Rejam → Rutinalar: jadval bo'yicha o'lchashni so'rab turadi (ilova ochiq va soat ulangan bo'lganda).
   useEffect(() => startRoutineRunner(), []);
+  // Bo'y, vazn, yosh, jins va qadam/uyqu maqsadi soatga: ulanganda va o'zgarganda (soat kkal/masofani shundan hisoblaydi).
+  useWatchPersonSync();
 
   return (
     <View className="flex-1 bg-background">
@@ -23,7 +26,7 @@ export default function AppLayout() {
       {/* Pastki safe area: tepadagi header kabi `surface` rangda (tab bar bu chiziq ustida suzib turadi) */}
       <View
         pointerEvents="none"
-        className="absolute inset-x-0 bottom-0 border-t border-border bg-surface"
+        className="absolute inset-x-0 bottom-0 bg-surface"
         style={{ height: insets.bottom }}
       />
 

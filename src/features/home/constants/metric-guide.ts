@@ -128,4 +128,53 @@ export const METRIC_GUIDE: Record<MetricKey, MetricGuide> = {
       ],
     },
   },
+  hrv: {
+    steps: [
+      "Qulay o'tiring va 5 daqiqa dam oling.",
+      "Soatni bilakka zich taqing.",
+      "Qo'lni stolga, yurak balandligida qo'ying.",
+      "\"Boshlash\" ni bosing va taxminan bir daqiqa qimirlamang, gaplashmang.",
+      "Soat HRV ni ilovadan boshlashga ruxsat bermasa, ilova aytadi: soat menyusidan «HRV» ni ochib o'lchang, natija ilovada o'zi paydo bo'ladi.",
+    ],
+    standard: {
+      name: "Umumiy yo'naltiruvchi qiymatlar (yoshga bog'liq)",
+      ranges: [
+        { label: "Past", range: "20 ms dan kam", tone: "warning" },
+        { label: "Odatiy", range: "20–100 ms", tone: "success" },
+        { label: "Yuqori", range: "100 ms dan ko'p", tone: "info" },
+      ],
+    },
+  },
+  stress: {
+    steps: [
+      "Tinch joyda o'tiring va bir necha daqiqa dam oling.",
+      "Soatni bilakka zich taqing.",
+      "Qo'lni stolga qo'ying, qimirlamang.",
+      "\"Boshlash\" ni bosing va natijani kuting.",
+    ],
+    standard: {
+      name: "Soatning stress shkalasi (0–100)",
+      ranges: [
+        { label: "Bo'shashgan", range: "0–25", tone: "success" },
+        { label: "Normal", range: "26–50", tone: "success" },
+        { label: "O'rtacha", range: "51–75", tone: "warning" },
+        { label: "Yuqori", range: "76–100", tone: "danger" },
+      ],
+    },
+  },
+  bodyComp: {
+    steps: [
+      "Ovqat va mashqdan keyin kamida 2 soat kuting.",
+      "Soatni bilakka zich taqing, qo'l quruq va toza bo'lsin.",
+      "\"Boshlash\" ni bosib, boshqa qo'l barmog'ini soatning metall qismiga (elektrodga) tegizing.",
+      "Natija chiqquncha barmoqni ko'tarmang va qimirlamang.",
+    ],
+    standard: {
+      name: "Yog' ulushi, umumiy yo'naltiruvchi (taxminiy)",
+      ranges: [
+        { label: "Erkaklar", range: "~10–20 %", tone: "success" },
+        { label: "Ayollar", range: "~18–28 %", tone: "success" },
+      ],
+    },
+  },
 };

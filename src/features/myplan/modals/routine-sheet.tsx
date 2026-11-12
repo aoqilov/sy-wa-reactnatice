@@ -77,7 +77,8 @@ export function RoutineSheet({ visible, onClose, metrics, routines, editingKey, 
           })}
         </View>
         <CusText variant="caption" tone="muted">
-          EKG rutinaga qo&apos;shilmaydi: uning uchun barmoqni elektrodga qo&apos;yish kerak.
+          EKG va tana tarkibi rutinaga qo&apos;shilmaydi: ular uchun barmoqni elektrodga qo&apos;yish kerak. HRV ni bu soat
+          faqat o&apos;zida o&apos;lchaydi.
         </CusText>
       </View>
 

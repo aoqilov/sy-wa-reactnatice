@@ -13,6 +13,14 @@ Home'dagi o'lchovlar:
 | `ecg` | EKG | Elektrod (barmoq) | Ishlaydi, [ecg.md](ecg.md) |
 | `sugar` | Shakar | Optik, taxminiy | Ishlaydi (2026-11-10) |
 | `blood` | Qon tahlili | Optik, taxminiy | Ishlaydi (2026-11-10) |
+| `hrv` | HRV | S105: **faqat soatda** o'lchanadi, ilova soat xotirasidan o'qiydi (`readManualData` "hrv") | 2026-11-11: ilovadan boshlash "qo'llanmaydi" chiqdi, soatda o'lchash yo'li qo'shildi, sinalmagan |
+| `stress` | Stress (0..100) | Optik (`startDetectPressure`) | Yozildi 2026-11-11, soatda sinalmagan |
+| ~~`met`~~ | MET | — | **Ilovadan olib tashlandi (2026-11-11, foydalanuvchi qarori).** Native `startMet`/`stopMet` va soat xotirasidan "met" o'qish modulda qoldi, ilova ishlatmaydi |
+
+**HRV va MET nima uchun soatda:** SDK `startDetectHrv` / `startDetectMet` ichida `FunctionCheckUtil.checkHrvAppDetect()` / `checkMetDetect()` → `VpSpGetUtil.isSupportHrvAppDetect()` / `isSupportMetAppDetect()` ni tekshiradi (AAR bayt-kodi). S105 bu bayroqlarni false yuboradi: funksiya bor (`isSupportHRV`, `isSupportMet`, H Band "Module Manager" da ko'rinadi), lekin ilovadan boshlab bo'lmaydi, SDK buyruqni soatga yubormaydi. Shuning uchun ilovada "Boshlash" → native `featureUnsupported` → `startOnWatchManual` (nasosli bosimdagi `startOnWatchBp` andozasi): foydalanuvchi soat menyusidan o'lchaydi, ilova har 5 s da `readDeviceManualData(HRV | MET)` bilan yangi yozuvni kutadi (4 daqiqagacha). Soatda o'lchangan HRV/MET Tarix sinxroniga ham qo'shildi. MET yozuvining birligi (`MetoManualData.meto`, Int) hujjatda yo'q: |qiymat| > 20 bo'lsa 10 ga bo'linadi **[?]**.
+| `bodyComp` | Tana tarkibi | Elektrod, bioimpedans (`startDetectBodyComponent`), taxminiy | Yozildi 2026-11-11, soatda sinalmagan |
+
+Yangi to'rttasi: native `startHrv/startStress/startMet/startBodyComp` (`WatchController.kt`), oqimlar `measure.ts` da. Qo'llab-quvvatlash SDK bayroqlari bilan oldindan tekshiriladi (`isSupportHRV`+`isSupportHrvAppDetect`, `isSupportStress`, `isSupportMet`+`isSupportMetAppDetect`, `isSupportBodyComponent`): yo'q bo'lsa `featureUnsupported` xatosi. Tana tarkibi bo'y, vazn, yosh va jinsga tayanadi; ilova bu ma'lumotni soatga hali yubormaydi (soatda H Band ilovasida kiritilgani ishlatiladi).
 
 Optik bosim (`startDetectBP`) **olib tashlangan**: S105 unga javob bermaydi (7-bo'lim).
 

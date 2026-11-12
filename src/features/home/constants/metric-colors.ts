@@ -11,6 +11,9 @@ export const METRIC_COLORS: Record<MetricKey, string> = {
   ecg: "#15803D", // to'q yashil
   blood: "#BE123C", // qizilroq (puls qizilidan to'qroq)
   sugar: "#8B5CF6", // binafsha
+  hrv: "#EC4899", // pushti
+  stress: "#14B8A6", // firuza
+  bodyComp: "#0891B2", // moviy (cyan)
 };
 
 /** "#RRGGBB" rangning shaffofligi o'zgargan nusxasi ("rgba(...)"): och/to'q mavzuda fon ustida bir xil tus beradi. */

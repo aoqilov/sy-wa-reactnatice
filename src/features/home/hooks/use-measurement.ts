@@ -10,6 +10,7 @@ import {
   type MeasureProgress,
   startMeasure,
   startOnWatchBp,
+  startOnWatchManual,
 } from "@/shared/watch/measure";
 
 import { Metric } from "../api/get-metrics";
@@ -56,13 +57,18 @@ function liveDisplay(
 ): { big: string; caption: string } {
   // Qolgan vaqt ma'lum bo'lsa ("0:18"), bo'lmasa foiz.
   const percent = run.remainingS !== null ? clock(run.remainingS) : `${Math.round(run.progress * 100)}%`;
-  if (run.hint === "onWatch") return { big: "…", caption: t("measure.onWatch.caption") };
+  if (run.hint === "onWatch" || run.hint === "onWatchHrv") {
+    return { big: "…", caption: t("measure.onWatch.caption") };
+  }
   if (key === "pressurePump") {
     return run.live === null
       ? { big: "…", caption: t("measure.note.opening") }
       : { big: String(run.live), caption: t("measure.note.cushion") };
   }
-  if (key === "temperature") return { big: "…", caption: percent };
+  // Harorat, stress, tana tarkibi: soat qiymatni faqat oxirida beradi, o'lchash paytida foiz (yoki qolgan vaqt).
+  if (key === "temperature" || key === "stress" || key === "bodyComp") {
+    return { big: "…", caption: percent };
+  }
   // Shakar: soat qiymatni faqat oxirida beradi.
   if (key === "sugar") return { big: "…", caption: `${percent} · ${t("measure.note.glucose")}` };
   // Qon tahlili: beshta qiymat faqat oxirida (doira ostidagi kartada hammasi birga).
@@ -115,7 +121,8 @@ export function useMeasurement(metrics: Metric[]) {
   /** Bitta o'lchash oqimini ishga tushiradi va natijani/xatoni shu yerda qayta ishlaydi. */
   const begin = (runner: (handlers: MeasureHandlers) => () => void, key: MetricKey, viaWatch: boolean) => {
     const startedAt = now();
-    setRun({ progress: 0, live: null, hint: viaWatch ? "onWatch" : null, startedAt, remainingS: null });
+    const watchHint = key === "hrv" ? "onWatchHrv" : "onWatch";
+    setRun({ progress: 0, live: null, hint: viaWatch ? watchHint : null, startedAt, remainingS: null });
     cancelRef.current = runner({
       onProgress: (p) =>
         setRun({ ...p, startedAt, remainingS: remainingSeconds(p.progress, now() - startedAt) }),
@@ -144,6 +151,12 @@ export function useMeasurement(metrics: Metric[]) {
         // o'zida o'lchanadi, ilova natijani soat xotirasidan o'qiydi (synapse-soat dagi kabi).
         if (key === "pressurePump" && !viaWatch && (code === "noReply" || code === "cuffUnsupported")) {
           begin(startOnWatchBp, key, true);
+          return;
+        }
+        // HRV: soat ilovadan boshlashga ruxsat bermasa (S105), o'lchov soatning o'zida qilinadi, ilova natijani
+        // soat xotirasidan kutadi.
+        if (key === "hrv" && !viaWatch && code === "featureUnsupported") {
+          begin((h) => startOnWatchManual(key, h), key, true);
           return;
         }
         setError(t(`measure.error.${code}`));

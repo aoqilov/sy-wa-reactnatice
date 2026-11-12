@@ -26,6 +26,20 @@
 -keep class com.bluetrum.** { *; }
 -keep class vpno.nordicsemi.** { *; }
 
+# Gson (2.10.1 o'z R8 qoidalarini olib kelmaydi, 2.11+ dan boshlab bor). SDK server javoblarini
+# `new TypeToken<List<TUiTheme>>(){}` bilan o'qiydi (UiServerHttpUtil.getThemeInfo). R8 to'liq rejimi
+# TypeToken anonim klasslarining generic imzosini o'chiradi va siferblat ro'yxatida shu xato chiqdi:
+#   TypeToken must be created with a type argument: new TypeToken<...>() {}
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
+-keep,allowobfuscation,allowshrinking class com.google.gson.reflect.TypeToken
+-keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
+-keep class com.google.gson.** { *; }
+-keepclassmembers,allowobfuscation class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+-dontwarn com.google.gson.**
+
 # Parcelable.CREATOR va enum'lar SDK ichida reflection orqali ishlatilishi mumkin
 -keepclassmembers class * implements android.os.Parcelable {
     public static final ** CREATOR;

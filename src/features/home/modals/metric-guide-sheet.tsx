@@ -1,20 +1,14 @@
-import Octicons from "@expo/vector-icons/Octicons";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
-import {
-  CusBadge,
-  CusBottomSheet,
-  CusCard,
-  CusDivider,
-  CusImage,
-  CusMenuTabs,
-  CusText,
-} from "@/components/ui";
+import { CusBadge, CusBottomSheet, CusCard, CusDivider, CusMenuTabs, CusText } from "@/components/ui";
+import { useThemeColor } from "@/shared/theme/use-theme-color";
 
 import { Metric } from "../api/get-metrics";
+import { GuideAnimation } from "../components/guide-animation";
+import { withAlpha } from "../constants/metric-colors";
 import { METRIC_GUIDE } from "../constants/metric-guide";
-import { METRIC_IMAGES } from "../constants/metric-images";
+import { type HowSection, METRIC_HOW } from "../constants/metric-how";
 
 type Props = {
   metric: Metric;
@@ -22,15 +16,16 @@ type Props = {
   onClose: () => void;
 };
 
-type TabKey = "video" | "text" | "standard";
+type TabKey = "video" | "text" | "standard" | "how";
 
 const TABS: { label: string; value: TabKey }[] = [
   { label: "Video", value: "video" },
   { label: "Matn", value: "text" },
   { label: "Standart", value: "standard" },
+  { label: "Soat qanday o'lchaydi", value: "how" },
 ];
 
-// Qanday o'lchash bo'yicha ko'rsatma. Standart bo'yicha to'liq ekranda (1) ochiladi, 3 ta bo'limi bor.
+// Qanday o'lchash bo'yicha ko'rsatma. Standart bo'yicha to'liq ekranda (1) ochiladi, 4 ta bo'limi bor.
 export function MetricGuideSheet({ metric, visible, onClose }: Props) {
   const [tab, setTab] = useState<TabKey>("video");
   const guide = METRIC_GUIDE[metric.key];
@@ -48,27 +43,18 @@ export function MetricGuideSheet({ metric, visible, onClose }: Props) {
       {tab === "video" ? <VideoTab metric={metric} /> : null}
       {tab === "text" ? <TextTab steps={guide.steps} /> : null}
       {tab === "standard" ? <StandardTab standard={guide.standard} /> : null}
+      {tab === "how" ? <HowTab sections={METRIC_HOW[metric.key]} /> : null}
     </CusBottomSheet>
   );
 }
 
-// Video: hozircha namuna (mock). Rasm va "play" tugmasi, video keyin ulanadi.
+// Video: 1:1 qisqa animatsiya (ilovaning o'zida chiziladi, components/guide-animation.tsx). Batafsil qadamlar Matn tabida.
 function VideoTab({ metric }: { metric: Metric }) {
   return (
     <View className="gap-3">
-      <View style={{ height: 200, borderRadius: 16, overflow: "hidden" }}>
-        <CusImage source={METRIC_IMAGES[metric.key]} style={{ width: "100%", height: "100%" }} />
-        <View style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.35)" }} />
-        <Pressable
-          accessibilityLabel="Videoni ijro etish"
-          className="items-center justify-center rounded-full bg-surface"
-          style={{ position: "absolute", top: 80, left: "50%", marginLeft: -24, width: 48, height: 48 }}
-        >
-          <Octicons name="play" size={22} color="#1B2230" />
-        </Pressable>
-      </View>
-      <CusText tone="muted">
-        {metric.title} o&apos;lchash bo&apos;yicha qisqa video qo&apos;llanma. Video tez orada qo&apos;shiladi (hozircha namuna).
+      <GuideAnimation metricKey={metric.key} />
+      <CusText variant="caption" tone="muted">
+        {metric.title} o&apos;lchashda qo&apos;l va soatning to&apos;g&apos;ri holati. Batafsil qadamlar «Matn» tabida.
       </CusText>
     </View>
   );
@@ -88,6 +74,35 @@ function TextTab({ steps }: { steps: string[] }) {
           <CusText className="flex-1">{step}</CusText>
         </View>
       ))}
+    </View>
+  );
+}
+
+// Soat qanday o'lchaydi: datchik va ishlash tamoyili, ilova nima qiladi, aniqlikka nima ta'sir qiladi.
+function HowTab({ sections }: { sections: HowSection[] }) {
+  const danger = useThemeColor("danger", "#E0342F");
+  return (
+    <View className="gap-4">
+      {sections.map((s) => {
+        // "Muhim" va "Muhim ogohlantirish": juda och qizil fonli blok, ko'zga tashlansin, lekin baqirmasin.
+        const important = s.heading.startsWith("Muhim");
+        return (
+          <View
+            key={s.heading}
+            className={`gap-1 ${important ? "rounded-xl border p-3" : ""}`}
+            style={
+              important
+                ? { backgroundColor: withAlpha(danger, 0.06), borderColor: withAlpha(danger, 0.2) }
+                : undefined
+            }
+          >
+            <CusText variant="heading" tone={important ? "danger" : undefined}>
+              {s.heading}
+            </CusText>
+            <CusText>{s.text}</CusText>
+          </View>
+        );
+      })}
     </View>
   );
 }
