@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { CusButton, CusScrollView, CusText } from "@/components/ui";
-import { ActivityCard } from "@/features/activity";
+import { useActivityGoals, useTodayActivity } from "@/features/activity";
 import { EcgLiveStrip } from "@/features/ecg";
 import { useT } from "@/shared/i18n/use-t";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
@@ -14,6 +14,8 @@ import { Metric } from "./api/get-metrics";
 import { BloodResult } from "./components/blood-result";
 import { MeasureCircle } from "./components/measure-circle";
 import { MetricSelector } from "./components/metric-selector";
+import { StepsCard } from "./components/steps-card";
+import { StepsHero } from "./components/steps-hero";
 import { useMeasurement } from "./hooks/use-measurement";
 import { useMetrics } from "./hooks/use-metrics";
 import { MetricGuideSheet } from "./modals/metric-guide-sheet";
@@ -62,34 +64,57 @@ function HomeContent({
   const [infoOpen, setInfoOpen] = useState(false);
   const infoMetric = items.find((m) => m.key === infoKey) ?? items[0];
 
+  // "Qadamlar" kartasi tanlangan: tepada o'lchash doirasi o'rnida katta qadam halqasi. O'lchov kartasi bosilsa qaytadi.
+  // Ma'lumot bir marta o'qiladi va karta bilan halqaga beriladi.
+  const [stepsView, setStepsView] = useState(false);
+  const activity = useTodayActivity();
+  const { goals, save: saveGoals } = useActivityGoals();
+  const showSteps = stepsView && activity.available && !measuring;
+
+  const selectMetric = (key: Metric["key"]) => {
+    setStepsView(false);
+    select(key);
+  };
+
   return (
     <View className="flex-1 bg-background">
       {/* Tepa qism qimirlamaydi: scroll paytida doira yopilib qolmaydi */}
       <View className="items-center gap-5 pb-5 pt-6">
-        {/* "Qanday o'lchanadi?" — chap yuqori burchakda */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Qanday o'lchanadi?"
-          onPress={() => setGuideOpen(true)}
-          hitSlop={8}
-          className="absolute left-4 top-3 z-10 h-11 w-11 items-center justify-center rounded-full border border-border bg-surface"
-        >
-          <Octicons name="question" size={22} color={primary} />
-        </Pressable>
+        {/* "Qanday o'lchanadi?" — chap yuqori burchakda (faqat o'lchov uchun) */}
+        {!showSteps ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Qanday o'lchanadi?"
+            onPress={() => setGuideOpen(true)}
+            hitSlop={8}
+            className="absolute left-4 top-3 z-10 h-11 w-11 items-center justify-center rounded-full border border-border bg-surface"
+          >
+            <Octicons name="question" size={22} color={primary} />
+          </Pressable>
+        ) : null}
 
-        {/* 1. O'lchash */}
-        <MeasureCircle
-          metric={current}
-          measuring={measuring}
-          progress={progress}
-          display={display}
-          onStart={start}
-          onCancel={cancel}
-        />
+        {/* 1. O'lchash yoki (Qadamlar tanlangan bo'lsa) katta qadam halqasi */}
+        {showSteps ? (
+          <StepsHero
+            today={activity.today}
+            goals={goals}
+            ready={activity.ready}
+            onSaveGoals={(g) => void saveGoals(g)}
+          />
+        ) : (
+          <MeasureCircle
+            metric={current}
+            measuring={measuring}
+            progress={progress}
+            display={display}
+            onStart={start}
+            onCancel={cancel}
+          />
+        )}
 
         {/* EKG: o'lchash paytida jonli to'lqin; boshqa paytda saqlangan yozuvlar History sahifasida (hisoboti bilan) */}
         {current.key === "ecg" && measuring ? <EcgLiveStrip /> : null}
-        {current.key === "ecg" && !measuring ? (
+        {current.key === "ecg" && !measuring && !showSteps ? (
           <CusButton
             title={t("ecg.records")}
             variant="ghost"
@@ -112,7 +137,7 @@ function HomeContent({
         ) : null}
 
         {/* Soat o'lchovni yakunlay olmasa (taqilmagan, band, aloqa uzilgan ...) sababi shu yerda */}
-        {error ? (
+        {error && !showSteps ? (
           <CusText variant="caption" tone="danger" className="px-6 text-center">
             {error}
           </CusText>
@@ -134,13 +159,8 @@ function HomeContent({
         </View>
 
         <CusScrollView className="flex-1" contentContainerStyle={{ paddingBottom: tabBarSpace }}>
-          {/* Bugungi faollik: qadam halqasi, kkal, masofa (soatdan) */}
-          <View className="px-4 pt-2">
-            <ActivityCard />
-          </View>
-
           {/* Qon tahlili: beshta ko'rsatkich (lipidlar, siydik kislotasi) hammasi bitta kartada */}
-          {current.key === "blood" && current.blood && !measuring ? (
+          {current.key === "blood" && current.blood && !measuring && !showSteps ? (
             <View className="px-4 pt-2">
               <BloodResult rows={current.blood} updatedAt={current.updatedAt} />
             </View>
@@ -148,8 +168,22 @@ function HomeContent({
 
           <MetricSelector
             metrics={items}
-            selectedKey={selectedKey}
-            onSelect={select}
+            selectedKey={showSteps ? null : selectedKey}
+            onSelect={selectMetric}
+            leading={
+              activity.available
+                ? (width) => (
+                    <StepsCard
+                      today={activity.today}
+                      goals={goals}
+                      width={width}
+                      active={showSteps}
+                      disabled={measuring}
+                      onSelect={() => setStepsView(true)}
+                    />
+                  )
+                : undefined
+            }
             onInfo={(key) => {
               setInfoKey(key);
               setInfoOpen(true);

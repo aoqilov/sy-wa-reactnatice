@@ -223,7 +223,10 @@ export async function syncWatchHistory(days: number): Promise<SyncResult> {
   if (isMeasuring()) return { ok: false, reason: "busy" };
   if (typeof watch.readManualData !== "function") return { ok: false, reason: "outdated" };
 
-  const since = Math.floor((Date.now() - days * DAY_MS) / 1000);
+  // Qo'lda o'lchovlar: oxirgi sinxrondan 1 kun oldingisidan (birinchi marta — `days` kun). Soat kam yozuv yuboradi.
+  const lastSync = await loadLastSync();
+  const sinceMs = Math.max(Date.now() - days * DAY_MS, lastSync !== null ? lastSync - DAY_MS : 0);
+  const since = Math.floor(sinceMs / 1000);
   const found: WatchRecord[] = [];
 
   const manual = await readStream(
@@ -241,20 +244,32 @@ export async function syncWatchHistory(days: number): Promise<SyncResult> {
     MAX_MS,
   );
 
+  // Avto-o'lchovlar (kunlik 5 daqiqalik ma'lumot). Yangi APK'da faqat yangi qism o'qiladi (readDailyIncremental),
+  // eskisida — avvalgidek hamma kunlar boshidan.
   let daily: ReadOutcome = "failed";
-  if (typeof watch.readDailyData === "function" && getWatchConnection().status === "ready" && !isMeasuring()) {
-    const auto: WatchRecord[] = [];
-    daily = await readStream(
-      "dailyData",
-      () => watch.readDailyData(days),
-      (e) => {
-        if (!Array.isArray(e.records)) return;
-        for (const raw of e.records as Record<string, unknown>[]) auto.push(...fromDaily(raw));
-      },
-      DAILY_IDLE_MS,
-      DAILY_MAX_MS,
-    );
-    found.push(...bucketContinuous(auto));
+  /** Avto yozuvlari almashtiriladigan vaqt oraliqlari [from, to): shu oraliqdagi eski avto yozuvlar o'chadi. */
+  let replace: [number, number][] = [];
+  if (getWatchConnection().status === "ready" && !isMeasuring()) {
+    if (typeof watch.readDailyDay === "function") {
+      const inc = await readDailyIncremental();
+      daily = inc.outcome;
+      replace = inc.replace;
+      found.push(...inc.records);
+    } else if (typeof watch.readDailyData === "function") {
+      const auto: WatchRecord[] = [];
+      daily = await readStream(
+        "dailyData",
+        () => watch.readDailyData(days),
+        (e) => {
+          if (!Array.isArray(e.records)) return;
+          for (const raw of e.records as Record<string, unknown>[]) auto.push(...fromDaily(raw));
+        },
+        DAILY_IDLE_MS,
+        DAILY_MAX_MS,
+      );
+      found.push(...bucketContinuous(auto));
+      if (daily === "complete") replace = [[Date.now() - days * DAY_MS, Infinity]];
+    }
   }
 
   if (manual !== "complete" && daily !== "complete" && found.length === 0) {
@@ -263,10 +278,10 @@ export async function syncWatchHistory(days: number): Promise<SyncResult> {
   }
 
   const saved = await loadWatchHistory();
-  // Kunlik ma'lumot har safar qaytadan o'qiladi: shu kunlarning avto yozuvlari yangisi bilan almashtiriladi
-  // (30 daqiqalik bo'lak to'lib borgan bo'lishi mumkin). Qo'lda o'lchovlar esa faqat qo'shiladi.
-  const dailyFrom = daily === "complete" ? Date.now() - days * DAY_MS : Infinity;
-  const kept = saved.filter((r) => !(r.auto && r.at >= dailyFrom));
+  // O'qilgan oraliqlarning avto yozuvlari yangisi bilan almashtiriladi (30 daqiqalik bo'lak to'lib borgan bo'lishi
+  // mumkin). Qo'lda o'lchovlar esa faqat qo'shiladi.
+  const inReplaced = (at: number) => replace.some(([from, to]) => at >= from && at < to);
+  const kept = saved.filter((r) => !(r.auto && inReplaced(r.at)));
   const known = new Set(kept.map(idOf));
   const fresh = found.filter((r) => !known.has(idOf(r)));
   const keepFrom = Date.now() - KEEP_DAYS * DAY_MS;
@@ -276,4 +291,114 @@ export async function syncWatchHistory(days: number): Promise<SyncResult> {
   const added = fresh.length - (saved.length - kept.length);
   logWatch(`[historySync] manual ${manual}, daily ${daily}: ${found.length} yozuv, ${Math.max(0, added)} yangi`);
   return { ok: true, added: Math.max(0, added) };
+}
+
+// ---------------------------------------------------------------- kunlik ma'lumot: faqat yangi qism
+
+const CURSOR_KEY = "watchHistory.dailyCursor.v1";
+/** Bugungi kunni shuncha paket (5 daqiqadan, ya'ni 1 soat) orqadan qayta o'qiymiz: oxirgi 30 daqiqalik bo'lak to'lsin. */
+const OVERLAP_PACKAGES = 12;
+const DEFAULT_WATCH_DAYS = 3;
+
+type DailyCursor = {
+  /** Bugungi kun ("YYYY-MM-DD") va unda oxirgi o'qilgan paketlar soni. */
+  day: string;
+  packages: number;
+  /** To'liq o'qilgan o'tgan kunlar: ular endi o'zgarmaydi, qayta o'qilmaydi. */
+  doneDays: string[];
+  watchDays: number;
+};
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const dateKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const startOfDay = (offset: number) => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - offset).getTime();
+};
+
+/**
+ * Sinxronning sekin qismi shu edi: har safar soatdagi barcha kunlar (kuniga 288 tagacha paket) boshidan o'qilardi.
+ * Endi: o'tgan kunlar bir marta to'liq o'qiladi (ular o'zgarmaydi), bugun esa oxirgi o'qilgan joydan
+ * (1 soat orqadan) davom etadi. Natijadagi `replace` — shu o'qishda yangilangan vaqt oraliqlari.
+ */
+async function readDailyIncremental(): Promise<{ outcome: ReadOutcome; records: WatchRecord[]; replace: [number, number][] }> {
+  const watch = watchModule;
+  if (!watch) return { outcome: "failed", records: [], replace: [] };
+  const saved = await getJSON<DailyCursor>(CURSOR_KEY);
+  const today = dateKey(new Date());
+  const cursor: DailyCursor = {
+    day: saved?.day ?? "",
+    packages: saved?.packages ?? 0,
+    doneDays: saved?.doneDays ?? [],
+    watchDays: saved?.watchDays ?? DEFAULT_WATCH_DAYS,
+  };
+
+  const records: WatchRecord[] = [];
+  const replace: [number, number][] = [];
+  let outcome: ReadOutcome = "failed";
+
+  const readDay = async (day: number, position: number) => {
+    const auto: WatchRecord[] = [];
+    let total: number | null = null;
+    const how = await readStream(
+      "dailyData",
+      () => watch.readDailyDay(day, position),
+      (e) => {
+        if (typeof e.allPackage === "number") total = Math.max(total ?? 0, e.allPackage);
+        if (typeof e.watchDays === "number" && e.watchDays > 0) cursor.watchDays = e.watchDays;
+        if (!Array.isArray(e.records)) return;
+        for (const raw of e.records as Record<string, unknown>[]) auto.push(...fromDaily(raw));
+      },
+      DAILY_IDLE_MS,
+      DAILY_MAX_MS,
+    );
+    // Umumiy natija: birortasi to'liq o'qilsa "complete", aks holda eng yaxshisi.
+    if (how === "complete") outcome = "complete";
+    else if (how === "idle" && outcome === "failed") outcome = "idle";
+    return { how, auto, total: total as number | null };
+  };
+
+  // 1) O'tgan kunlar (eskisidan): hali to'liq o'qilmaganlari.
+  for (let day = cursor.watchDays - 1; day >= 1; day--) {
+    const key = dateKey(new Date(startOfDay(day)));
+    if (cursor.doneDays.includes(key)) continue;
+    if (getWatchConnection().status !== "ready" || isMeasuring()) break;
+    const r = await readDay(day, 1);
+    if (r.how !== "complete") continue;
+    records.push(...bucketContinuous(r.auto));
+    replace.push([startOfDay(day), startOfDay(day - 1)]);
+    cursor.doneDays.push(key);
+  }
+
+  // 2) Bugun: oxirgi o'qilgan joydan 1 soat orqadan (kun almashgan bo'lsa boshidan).
+  if (getWatchConnection().status === "ready" && !isMeasuring()) {
+    const position = cursor.day === today ? Math.max(1, cursor.packages - OVERLAP_PACKAGES) : 1;
+    const r = await readDay(0, position);
+    if (r.how === "complete" || r.auto.length > 0) {
+      const dayStart = startOfDay(0);
+      let from = dayStart;
+      let fresh = r.auto;
+      if (position > 1) {
+        // Birinchi bo'lak qisman o'qilgan bo'lishi mumkin: undan keyingisidan boshlab almashtiramiz, eskisi qoladi.
+        const first = Math.min(...r.auto.map((x) => x.at));
+        from = Number.isFinite(first) ? Math.floor(first / DAILY_BUCKET_MS) * DAILY_BUCKET_MS + DAILY_BUCKET_MS : Infinity;
+        fresh = r.auto.filter((x) => x.at >= from);
+      }
+      records.push(...bucketContinuous(fresh));
+      if (Number.isFinite(from)) replace.push([from, Infinity]);
+      if (r.how === "complete") {
+        cursor.day = today;
+        cursor.packages = r.total ?? cursor.packages;
+      }
+    }
+  }
+
+  // Faqat soat saqlaydigan kunlar eslab qolinadi.
+  const oldest = startOfDay(cursor.watchDays + 1);
+  cursor.doneDays = cursor.doneDays.filter((k) => {
+    const [y, m, d] = k.split("-").map(Number);
+    return new Date(y, m - 1, d).getTime() >= oldest;
+  });
+  await setJSON(CURSOR_KEY, cursor);
+  return { outcome, records, replace };
 }

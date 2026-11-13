@@ -67,6 +67,8 @@ declare class VeepooWatchModule extends NativeModule<VeepooWatchEvents> {
    * `{complete}` yoki `{timeout}`.
    */
   readDailyData(days: number): void;
+  /** Bitta kun (0 — bugun) [position]-paketdan: faqat yangi qism. "dailyData" {records} / {day, allPackage} / {complete}. */
+  readDailyDay(day: number, position: number): void;
   /** Soatdagi matnli budilniklar. Hodisa "textAlarm": `{op, alarms: [{id, hour, minute, repeat, content, open}]}`. */
   readTextAlarms(): void;
   /** `repeat`: 7 belgi, masalan "1111111" (har kuni). */

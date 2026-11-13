@@ -113,6 +113,7 @@ class VeepooWatchModule : Module() {
     Function("readManualBp") { sinceSec: Int -> controller().readManualBp(sinceSec) }
     Function("readManualData") { sinceSec: Int, kinds: List<String> -> controller().readManualData(sinceSec, kinds) }
     Function("readDailyData") { days: Int -> controller().readDailyData(days) }
+    Function("readDailyDay") { day: Int, position: Int -> controller().readDailyDay(day, position) }
 
     // Soatdagi eslatmalar (matnli budilnik)
     Function("readTextAlarms") { controller().readTextAlarms() }

@@ -44,6 +44,7 @@ class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
   readManualBp(_sinceSec: number): void {}
   readManualData(): void {}
   readDailyData(): void {}
+  readDailyDay(): void {}
   readTextAlarms(): void {}
   addTextAlarm(): void {}
   deleteTextAlarm(): void {}

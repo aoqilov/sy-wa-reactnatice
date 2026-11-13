@@ -13,12 +13,14 @@ export function CusScrollView({
 
   // viewH 0 bo'lsa (hali o'lchanmagan) scroll yoqilmaydi, o'lchangach to'g'rilanadi.
   const scrollable = viewH > 0 && contentH > viewH + 1;
+  // Pastga tortib yangilash (refreshControl) bo'lsa, mazmun sig'sa ham tortish ishlashi uchun scroll doim yoqiq.
+  const pullable = !!rest.refreshControl;
 
   return (
     <ScrollView
       {...rest}
-      scrollEnabled={scrollable}
-      alwaysBounceVertical={false}
+      scrollEnabled={scrollable || pullable}
+      alwaysBounceVertical={pullable}
       showsVerticalScrollIndicator={scrollable}
       onLayout={(e: LayoutChangeEvent) => {
         setViewH(e.nativeEvent.layout.height);

@@ -9,12 +9,15 @@ type Props = {
   size: number;
   stroke?: number;
   color: string;
+  /** Iz rangi; berilmasa mavzudagi chegara rangi. */
+  trackColor?: string;
   children?: React.ReactNode;
 };
 
-/** Maqsad halqasi: kulrang iz ustida rangli yoy, tepadan soat mili bo'yicha. Ichiga matn qo'yiladi. */
-export function StepRing({ progress, size, stroke = 10, color, children }: Props) {
-  const track = useThemeColor("border", "#E5E8EE");
+/** Maqsad halqasi: iz ustida rangli yoy, tepadan soat mili bo'yicha. Ichiga matn qo'yiladi. */
+export function StepRing({ progress, size, stroke = 10, color, trackColor, children }: Props) {
+  const border = useThemeColor("border", "#E5E8EE");
+  const track = trackColor ?? border;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const p = Math.max(0, Math.min(1, progress));

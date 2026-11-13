@@ -16,6 +16,11 @@ export const METRIC_COLORS: Record<MetricKey, string> = {
   bodyComp: "#0891B2", // moviy (cyan)
 };
 
+/** Qadamlar kartasi va katta qadam halqasi (o'lchov emas, shuning uchun METRIC_COLORS da yo'q). */
+export const STEPS_COLOR = "#F59E0B"; // kahrabo (amber)
+export const KCAL_COLOR = "#EF4444";
+export const DISTANCE_COLOR = "#0891B2";
+
 /** "#RRGGBB" rangning shaffofligi o'zgargan nusxasi ("rgba(...)"): och/to'q mavzuda fon ustida bir xil tus beradi. */
 export function withAlpha(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);

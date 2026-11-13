@@ -79,6 +79,7 @@ import com.veepoo.protocol.model.settings.CustomSetting
 import com.veepoo.protocol.model.settings.CustomSettingData
 import com.veepoo.protocol.listener.data.IOriginData3Listener
 import com.veepoo.protocol.listener.data.IOriginDataListener
+import com.veepoo.protocol.listener.data.IOriginProgressListener
 import com.veepoo.protocol.listener.data.ITextAlarmDataListener
 import com.veepoo.protocol.model.datas.HRVOriginData
 import com.veepoo.protocol.model.datas.OriginData
@@ -1154,7 +1155,21 @@ class WatchController(
    */
   fun readDailyData(days: Int) = safe("readDailyData") {
     if (!requireReady("readDailyData")) return@safe
-    val span = days.coerceIn(1, watchDays.coerceAtLeast(1))
+    readDaily(days.coerceIn(1, watchDays.coerceAtLeast(1)), -1, 1)
+  }
+
+  /**
+   * Bitta kunni ([day]: 0 — bugun, 1 — kecha ...) [position]-paketdan (1 dan) boshlab o'qiydi: sinxron faqat yangi
+   * qismini oladi (SDK `readOriginDataSingleDay` → `ReadOriginSetting(day, position, onlyReadOneDay = true, watchday)`).
+   * "dailyData" `{day, allPackage}` — kundagi jami paketlar (keyingi safar shundan davom etiladi).
+   */
+  fun readDailyDay(day: Int, position: Int) = safe("readDailyDay") {
+    if (!requireReady("readDailyDay")) return@safe
+    val days = watchDays.coerceAtLeast(1)
+    readDaily(days, day.coerceIn(0, days - 1), position.coerceAtLeast(1))
+  }
+
+  private fun readDaily(span: Int, singleDay: Int, position: Int) {
     val records = ArrayList<Map<String, Any?>>()
 
     fun flush() {
@@ -1178,10 +1193,23 @@ class WatchController(
       "temp" to d.temperature.takeIf { it > 0 },
     )
 
+    // Kun bo'yicha jami paketlar: JS bugungi kunni keyingi safar shu joydan davom ettiradi.
+    val reported = HashSet<Int>()
+    fun progressDetail(day: Int, allPackage: Int) {
+      if (reported.add(day)) emitData("dailyData", "day" to day, "allPackage" to allPackage, "watchDays" to watchDays)
+    }
+
+    fun readOrigin(listener: IOriginProgressListener) {
+      if (singleDay >= 0) {
+        manager.readOriginDataSingleDay(writer("readOriginDataSingleDay"), listener, singleDay, position, span)
+      } else {
+        manager.readOriginData(writer("readOriginData"), listener, span)
+      }
+    }
+
     val useV3 = VpSpGetUtil.getVpSpVariInstance(appContext).originProtocolVersion.let { it == 3 || it == 5 }
     if (useV3) {
-      manager.readOriginData(
-        writer("readOriginData"),
+      readOrigin(
         object : IOriginData3Listener {
           override fun onOriginFiveMinuteListDataChange(list: MutableList<OriginData3>?) {
             for (d in list ?: emptyList()) {
@@ -1211,7 +1239,8 @@ class WatchController(
           override fun onOriginHalfHourDataChange(data: OriginHalfHourData?) = Unit
           override fun onOriginHRVOriginListDataChange(list: MutableList<HRVOriginData>?) = Unit
           override fun onOriginSpo2OriginListDataChange(list: MutableList<Spo2hOriginData>?) = Unit
-          override fun onReadOriginProgressDetail(day: Int, date: String?, allPackage: Int, currentPackage: Int) = Unit
+          override fun onReadOriginProgressDetail(day: Int, date: String?, allPackage: Int, currentPackage: Int) =
+            progressDetail(day, allPackage)
           override fun onReadOriginProgress(progress: Float) = Unit
 
           override fun onReadOriginComplete() {
@@ -1224,18 +1253,19 @@ class WatchController(
             emitData("dailyData", "timeout" to true, "day" to day)
           }
         },
-        span,
       )
     } else {
-      manager.readOriginData(
-        writer("readOriginData"),
+      readOrigin(
         object : IOriginDataListener {
           override fun onOringinFiveMinuteDataChange(d: OriginData?) {
             if (d != null) add(d.getmTime(), fromBase(d))
           }
 
           override fun onOringinHalfHourDataChange(data: OriginHalfHourData?) = Unit
-          override fun onReadOriginProgressDetail(day: Int, date: String?, allPackage: Int, currentPackage: Int) = flush()
+          override fun onReadOriginProgressDetail(day: Int, date: String?, allPackage: Int, currentPackage: Int) {
+            flush()
+            progressDetail(day, allPackage)
+          }
           override fun onReadOriginProgress(progress: Float) = Unit
 
           override fun onReadOriginComplete() {
@@ -1248,7 +1278,6 @@ class WatchController(
             emitData("dailyData", "timeout" to true, "day" to day)
           }
         },
-        span,
       )
     }
   }
@@ -1405,13 +1434,15 @@ class WatchController(
   /** "Soat" sahifasidagi kalit: haqiqiy qo'ng'iroqlarni soatga uzatish. Soatdagi qo'ng'iroq kalitini ham yoqadi. */
   fun setCallForwarding(on: Boolean) = safe("setCallForwarding") {
     callBridge.setEnabled(on)
-    if (on && ready) {
-      ensurePhoneListener()
-      val data = lastSocial ?: manager.functionSocailMsgData
-      if (data != null && data.phone != EFunctionStatus.SUPPORT_OPEN) {
-        data.phone = EFunctionStatus.SUPPORT_OPEN
-        manager.settingSocialMsg(writer("settingSocialMsg"), socialListener(), data)
-      }
+    if (!ready) return@safe
+    if (on) ensurePhoneListener()
+    // Soatning o'zidagi "qo'ng'iroq eslatmasi" kaliti ham ilovadagi kalitga moslanadi: o'chirilganda soat boshqa
+    // manbadan (masalan, G Band ilovasi) kelgan qo'ng'iroq xabarini ham ko'rsatmaydi.
+    val want = if (on) EFunctionStatus.SUPPORT_OPEN else EFunctionStatus.SUPPORT_CLOSE
+    val data = lastSocial ?: manager.functionSocailMsgData
+    if (data != null && data.phone != want && data.phone != EFunctionStatus.UNSUPPORT) {
+      data.phone = want
+      manager.settingSocialMsg(writer("settingSocialMsg"), socialListener(), data)
     }
   }
 

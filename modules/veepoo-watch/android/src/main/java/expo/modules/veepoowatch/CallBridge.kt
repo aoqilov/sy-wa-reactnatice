@@ -48,6 +48,12 @@ class CallBridge(
   private val receiver = object : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
       if (intent?.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
+      // Kalit o'chiq bo'lsa hech narsa yuborilmaydi: modul qayta yaratilganda (JS qayta yuklanishi) eski nusxaning
+      // qabul qilgichi ro'yxatda qolib ketgan bo'lishi mumkin — kalit holati umumiy (SharedPreferences).
+      if (!enabled) {
+        unregister()
+        return
+      }
       @Suppress("DEPRECATION")
       val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
       when (intent.getStringExtra(TelephonyManager.EXTRA_STATE)) {

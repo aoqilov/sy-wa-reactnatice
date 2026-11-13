@@ -1,7 +1,7 @@
 import Octicons from "@expo/vector-icons/Octicons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, View } from "react-native";
 
 import { CusScrollView, CusText } from "@/components/ui";
 import type { MetricKey } from "@/features/home/api/get-metrics";
@@ -23,6 +23,7 @@ export function FeatureHistory({ focusKey }: { focusKey?: MetricKey }) {
   const [period, setPeriod] = useState<Period>("7d");
   const { summaries, loading, sync, refresh, connected } = useHistory(period);
   const tabBarSpace = useTabBarSpace();
+  const primary = useThemeColor("primary", "#1E6FEB");
 
   const ordered = focusKey
     ? [...summaries].sort((a, b) => Number(b.meta.key === focusKey) - Number(a.meta.key === focusKey))
@@ -44,6 +45,18 @@ export function FeatureHistory({ focusKey }: { focusKey?: MetricKey }) {
           className="flex-1"
           contentContainerClassName="gap-3 p-4"
           contentContainerStyle={{ paddingBottom: tabBarSpace }}
+          // Pastga tortish: soatdan yangi ma'lumot o'qiladi (soat ulangan bo'lsa).
+          refreshControl={
+            <RefreshControl
+              refreshing={sync.syncing}
+              onRefresh={() => {
+                if (connected) void refresh();
+              }}
+              enabled={connected}
+              colors={[primary]}
+              tintColor={primary}
+            />
+          }
         >
           {ordered.map((s) => (
             <HistoryCard
