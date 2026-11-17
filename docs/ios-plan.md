@@ -14,7 +14,7 @@ orqali topilib, joyida tuzatiladi (8-bosqich).
 
 SDK 2.2.113.15 o'rganildi, moslik jadvali: docs/ios-mapping.md. Asosiy topilmalar:
 - Freymvorklarda simulyator qismi yo'q, faqat iPhone (arm64). Kompilyatsiyani simulyator build'i bilan tekshirib
-  bo'lmaydi. Variant: GitHub Actions macOS runner'da imzosiz xcodebuild (.github/workflows/ios-compile.yml).
+  bo'lmaydi. Kompilyatsiya Mac'da Xcode bilan tekshiriladi ("Any iOS Device (arm64)" yoki ulangan iPhone).
 - SDK "o'zi saqlaydi" rejimida (VPPeripheralManage) ishlatiladi: kunlik ma'lumot, uyqu, soatdagi tana tarkibi
   faqat SDK bazasi orqali o'qiladi.
 - 7 ta freymvork va 2 ta pod kerak (VeepooBleSDK, JL_BLEKit, DFUnits, JLDialUnit, ZipZap, GRDFUSDK, ABParTool;
@@ -83,9 +83,10 @@ javoblar, ulanish va skan holatlari, JS xatolari (ErrorUtils, console.error/warn
 
 8. Telefonda sinash — kutilmoqda
 
-Kerak: Apple Developer akkaunti, iPhone, iOS build (EAS, foydalanuvchi ruxsati bilan).
-1. Build. Kompilyatsiya xatolari bo'lsa, EAS jurnalidan tuzatiladi. (Ixtiyoriy: avval GitHub Actions bilan bepul
-   tekshirish.)
+Kerak: Mac + Xcode (bor, 2026-11-17), iPhone. O'z iPhone'iga o'rnatish uchun oddiy Apple ID yetadi (7 kunlik
+imzo); TestFlight va App Store uchun Apple Developer akkaunti.
+1. Mac'da: git pull, npm ci, npx expo prebuild --platform ios, cd ios && pod install, .xcworkspace ni ochish,
+   Build. Kompilyatsiya xatolari Xcode'da chiqadi: nusxalab yuboriladi va tuzatiladi.
 2. Ilovani ochish: konsolda "Konsol yoqildi" va native funksiyalar yo'qligi haqida xato bo'lmasligi kerak.
 3. Ulanish: "[device] ..." qatori (bayroqlar), keyin har bo'lim: o'lchovlar, Tarix sinxroni, uyqu, Rejam, siferblat.
 4. Har xatoda: konsol -> Ulashish -> matnni yuborish.

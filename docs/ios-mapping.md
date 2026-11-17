@@ -67,8 +67,9 @@ Simulyator build'i ishlamaydi (1.1). Variantlar:
 | B. EAS custom build (`withoutCredentials`, imzosiz `xcodebuild`) | Har urinish EAS limitidan ketadi | A bilan bir xil. Imzosiz yig'ish EAS'da qo'llanishi **[?]** |
 | C. Simulyator build, SDK chaqiruvlari `#if !targetEnvironment(simulator)` ichida | EAS limiti | Faqat modul skeleti. SDK chaqiruvlari tekshirilmaydi |
 
-**Tavsiya: A.** Apple akkaunti ham, EAS limiti ham kerak emas. Haqiqiy o'rnatish (8-bosqich) baribir akkaunt va
-iPhone bilan bo'ladi.
+**Qaror (2026-11-17): mahalliy Mac + Xcode.** Foydalanuvchida Mac paydo bo'ldi, kompilyatsiya Xcode'da tekshiriladi
+(`expo prebuild --platform ios` → `pod install` → "Any iOS Device (arm64)" uchun Build). A variant (GitHub Actions
+workflow) yozilgan edi, lekin repoga qo'shilmadi: GitHub tokenida `workflow` ruxsati yo'q, Mac bilan esa kerak emas.
 
 ---
 
@@ -163,7 +164,7 @@ yozilgan.
    `cuffBloodPressureHigh/Low` bor, turi `VPHealthGlanceTypeCuffBp` (`1 << 3`). Android SDK'da ham bor:
    `startMiniCheckup`, `VpSpGetUtil.getMiniCheckupType()`. S105 uni qo'llashini keyingi Android build'da jurnalga
    yozib bilsa bo'ladi. Ikkalasi ham ishlamasa, iOS'da bosim faqat "soatda o'lchash" orqali.
-2. **Kompilyatsiya tekshiruvi** — 2-bo'lim, A variant: GitHub Actions'ni sozlash.
+2. **Kompilyatsiya tekshiruvi** — Mac'da Xcode bilan (2-bo'lim).
 3. **Jieli freymvorklari** — siferblatsiz ham kerakmi.
 4. **EKG to'lqini birligi** — `originalSignals` / `filterSignals` ADC'mi yoki mV'mi. Demo ilovadagi
    `VPAnalysisViewFactory` va EKG chizish kodidan tekshiriladi.
