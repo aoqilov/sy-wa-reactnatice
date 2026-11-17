@@ -1,5 +1,6 @@
-import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import Octicons from "@expo/vector-icons/Octicons";
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -12,7 +13,9 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
 
-import { CusButton, CusText } from "@/components/ui";
+import { CusText } from "@/components/ui";
+import { useUiScale } from "@/shared/settings/settings";
+import { useThemeColor } from "@/shared/theme/use-theme-color";
 
 import { EMPTY_VALUE, Metric, MetricStatus } from "../api/get-metrics";
 import { METRIC_COLORS, withAlpha } from "../constants/metric-colors";
@@ -134,12 +137,9 @@ export function MeasureCircle({ metric, measuring, progress, display, onStart, o
           <CusText variant="caption" tone="muted" className="px-6 text-center" numberOfLines={2}>
             {display?.caption ?? ""}
           </CusText>
-          <CusButton
-            title="Bekor qilish"
-            variant="outline"
-            className="mt-3 h-10"
-            onPress={onCancel}
-          />
+          <View className="mt-3">
+            <CircleButton title="Bekor qilish" icon="x" variant="outline" onPress={onCancel} />
+          </View>
         </>
       ) : (
         <>
@@ -160,14 +160,70 @@ export function MeasureCircle({ metric, measuring, progress, display, onStart, o
           <CusText variant="caption" tone="muted" className="px-8 text-center" numberOfLines={1}>
             {measured ? `Oxirgi o'lchov: ${metric.updatedAt}` : metric.updatedAt}
           </CusText>
-          <CusButton
-            title="Boshlash"
-            className="mt-3 h-10 px-8"
-            onPress={onStart}
-          />
+          <View className="mt-3">
+            <CircleButton title="Boshlash" icon="play" onPress={onStart} />
+          </View>
         </>
       )}
     </View>
+  );
+}
+
+const BUTTON_H = 40;
+
+/**
+ * Doira ichidagi tugma: yumaloq (pill), CusButton'dan pastroq (40 px, matn o'lchami bilan birga o'sadi), ikonka bilan.
+ * Rang ilovaning asosiy ko'k rangi (primary): to'liq — ko'k fon, chegarali — karta fonida ko'k belgi.
+ * `title` bo'lmasa — faqat ikonkali dumaloq tugma (`label` ekran o'quvchi uchun).
+ */
+function CircleButton({
+  title,
+  label,
+  icon,
+  variant = "primary",
+  onPress,
+}: {
+  title?: string;
+  label?: string;
+  icon: "play" | "x";
+  variant?: "primary" | "outline";
+  onPress: () => void;
+}) {
+  const scale = useUiScale();
+  const h = Math.round(BUTTON_H * scale);
+  const solid = variant === "primary";
+  const primary = useThemeColor("primary", "#1E6FEB");
+  const primaryDark = useThemeColor("primary-dark", "#1758BD");
+  const primarySoft = useThemeColor("primary-soft", "#E8F0FD");
+  const surface = useThemeColor("surface", "#FFFFFF");
+  const border = useThemeColor("border", "#E5E8EE");
+  // Bosilgan holat alohida: NativeWind className bilan birga `style` funksiyasini (({ pressed }) => ...) qo'llamaydi.
+  const [pressed, setPressed] = useState(false);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label ?? title}
+      onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      hitSlop={6}
+      style={{
+        height: h,
+        minWidth: h,
+        paddingHorizontal: title ? 20 : 0,
+        ...(solid
+          ? { backgroundColor: pressed ? primaryDark : primary }
+          : { borderWidth: 1, borderColor: border, backgroundColor: pressed ? primarySoft : surface }),
+      }}
+      className="flex-row items-center justify-center gap-2 rounded-full"
+    >
+      <Octicons name={icon} size={16} color={solid ? "#FFFFFF" : primary} />
+      {title ? (
+        <CusText className="font-semibold" style={solid ? { color: "#FFFFFF" } : undefined} numberOfLines={1}>
+          {title}
+        </CusText>
+      ) : null}
+    </Pressable>
   );
 }
 

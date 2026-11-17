@@ -6,12 +6,12 @@ import { ActivityIndicator, Pressable, View } from "react-native";
 import { CusButton, CusScrollView, CusText } from "@/components/ui";
 import { useActivityGoals, useTodayActivity } from "@/features/activity";
 import { EcgLiveStrip } from "@/features/ecg";
+import { SleepCard, SleepHero, SleepHowSheet, useSleep } from "@/features/sleep";
 import { useT } from "@/shared/i18n/use-t";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 import { useTabBarSpace } from "@/widgets/app-tabs/AppTabs";
 
 import { Metric } from "./api/get-metrics";
-import { BloodResult } from "./components/blood-result";
 import { MeasureCircle } from "./components/measure-circle";
 import { MetricSelector } from "./components/metric-selector";
 import { StepsCard } from "./components/steps-card";
@@ -57,6 +57,7 @@ function HomeContent({
   const primary = useThemeColor("primary", "#1E6FEB");
   const tabBarSpace = useTabBarSpace();
   const [guideOpen, setGuideOpen] = useState(false); // "Qanday o'lchanadi?" sheet'i
+  const [sleepHowOpen, setSleepHowOpen] = useState(false); // uyqu halqasida: "Soat uyquni qanday hisoblaydi?"
 
   // Info sheet: qaysi o'lchov haqida ekani va ochiq-yopiqligi alohida saqlanadi,
   // shunda yopilish animatsiyasi paytida sheet mazmuni o'zgarib ketmaydi.
@@ -64,15 +65,19 @@ function HomeContent({
   const [infoOpen, setInfoOpen] = useState(false);
   const infoMetric = items.find((m) => m.key === infoKey) ?? items[0];
 
-  // "Qadamlar" kartasi tanlangan: tepada o'lchash doirasi o'rnida katta qadam halqasi. O'lchov kartasi bosilsa qaytadi.
-  // Ma'lumot bir marta o'qiladi va karta bilan halqaga beriladi.
-  const [stepsView, setStepsView] = useState(false);
+  // "Qadamlar" yoki "Uyqu" kartasi tanlangan: tepada o'lchash doirasi o'rnida katta halqa. O'lchov kartasi bosilsa
+  // qaytadi. Ma'lumot bir marta o'qiladi va karta bilan halqaga beriladi. O'lchov ketayotganda doim o'lchash doirasi.
+  const [view, setView] = useState<"metric" | "steps" | "sleep">("metric");
   const activity = useTodayActivity();
   const { goals, save: saveGoals } = useActivityGoals();
-  const showSteps = stepsView && activity.available && !measuring;
+  const sleep = useSleep();
+  const showSteps = view === "steps" && activity.available && !measuring;
+  const showSleep = view === "sleep" && sleep.available && !measuring;
+  const showHero = showSteps || showSleep;
+  const leadingCount = (activity.available ? 1 : 0) + (sleep.available ? 1 : 0);
 
   const selectMetric = (key: Metric["key"]) => {
-    setStepsView(false);
+    setView("metric");
     select(key);
   };
 
@@ -80,12 +85,12 @@ function HomeContent({
     <View className="flex-1 bg-background">
       {/* Tepa qism qimirlamaydi: scroll paytida doira yopilib qolmaydi */}
       <View className="items-center gap-5 pb-5 pt-6">
-        {/* "Qanday o'lchanadi?" — chap yuqori burchakda (faqat o'lchov uchun) */}
+        {/* "Qanday o'lchanadi?" — chap yuqori burchakda: o'lchov uchun ko'rsatma, uyqu halqasida — uyqu qanday hisoblanadi */}
         {!showSteps ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Qanday o'lchanadi?"
-            onPress={() => setGuideOpen(true)}
+            accessibilityLabel={showSleep ? t("sleep.how.title") : "Qanday o'lchanadi?"}
+            onPress={() => (showSleep ? setSleepHowOpen(true) : setGuideOpen(true))}
             hitSlop={8}
             className="absolute left-4 top-3 z-10 h-11 w-11 items-center justify-center rounded-full border border-border bg-surface"
           >
@@ -100,6 +105,15 @@ function HomeContent({
             goals={goals}
             ready={activity.ready}
             onSaveGoals={(g) => void saveGoals(g)}
+            onDetails={() => router.push("/history/steps", { withAnchor: true })}
+          />
+        ) : showSleep ? (
+          <SleepHero
+            night={sleep.nights?.[0] ?? null}
+            goalMin={goals.sleepMin}
+            ready={sleep.ready}
+            syncing={sleep.syncing}
+            onDetails={() => router.push("/history/sleep", { withAnchor: true })}
           />
         ) : (
           <MeasureCircle
@@ -114,13 +128,32 @@ function HomeContent({
 
         {/* EKG: o'lchash paytida jonli to'lqin; boshqa paytda saqlangan yozuvlar History sahifasida (hisoboti bilan) */}
         {current.key === "ecg" && measuring ? <EcgLiveStrip /> : null}
-        {current.key === "ecg" && !measuring && !showSteps ? (
+        {current.key === "ecg" && !measuring && !showHero ? (
           <CusButton
             title={t("ecg.records")}
             variant="ghost"
             size="sm"
             onPress={() =>
               router.push({ pathname: "/history/[metric]", params: { metric: "ecg" } }, { withAnchor: true })
+            }
+          />
+        ) : null}
+        {/* Tana tarkibi va qon tahlili: yozuvlar EKG kabi Tarix'da (ro'yxat → natija sahifasi) */}
+        {current.key === "bodyComp" && !measuring && !showHero ? (
+          <CusButton
+            title={t("home.records.body")}
+            variant="ghost"
+            size="sm"
+            onPress={() => router.push("/history/body", { withAnchor: true })}
+          />
+        ) : null}
+        {current.key === "blood" && !measuring && !showHero ? (
+          <CusButton
+            title={t("home.records.blood")}
+            variant="ghost"
+            size="sm"
+            onPress={() =>
+              router.push({ pathname: "/history/[metric]", params: { metric: "blood" } }, { withAnchor: true })
             }
           />
         ) : null}
@@ -137,7 +170,7 @@ function HomeContent({
         ) : null}
 
         {/* Soat o'lchovni yakunlay olmasa (taqilmagan, band, aloqa uzilgan ...) sababi shu yerda */}
-        {error && !showSteps ? (
+        {error && !showHero ? (
           <CusText variant="caption" tone="danger" className="px-6 text-center">
             {error}
           </CusText>
@@ -159,28 +192,37 @@ function HomeContent({
         </View>
 
         <CusScrollView className="flex-1" contentContainerStyle={{ paddingBottom: tabBarSpace }}>
-          {/* Qon tahlili: beshta ko'rsatkich (lipidlar, siydik kislotasi) hammasi bitta kartada */}
-          {current.key === "blood" && current.blood && !measuring && !showSteps ? (
-            <View className="px-4 pt-2">
-              <BloodResult rows={current.blood} updatedAt={current.updatedAt} />
-            </View>
-          ) : null}
-
           <MetricSelector
             metrics={items}
-            selectedKey={showSteps ? null : selectedKey}
+            selectedKey={showHero ? null : selectedKey}
             onSelect={selectMetric}
+            leadingCount={leadingCount}
             leading={
-              activity.available
+              leadingCount > 0
                 ? (width) => (
-                    <StepsCard
-                      today={activity.today}
-                      goals={goals}
-                      width={width}
-                      active={showSteps}
-                      disabled={measuring}
-                      onSelect={() => setStepsView(true)}
-                    />
+                    <>
+                      {activity.available ? (
+                        <StepsCard
+                          today={activity.today}
+                          goals={goals}
+                          width={width}
+                          active={showSteps}
+                          disabled={measuring}
+                          onSelect={() => setView("steps")}
+                        />
+                      ) : null}
+                      {/* Uyqu: oxirgi kecha; bosilsa tepada uyqu halqasi, undan "Batafsil" → uyqu sahifasi */}
+                      {sleep.available ? (
+                        <SleepCard
+                          night={sleep.nights?.[0] ?? null}
+                          goalMin={goals.sleepMin}
+                          width={width}
+                          active={showSleep}
+                          disabled={measuring}
+                          onSelect={() => setView("sleep")}
+                        />
+                      ) : null}
+                    </>
                   )
                 : undefined
             }
@@ -203,6 +245,8 @@ function HomeContent({
         visible={guideOpen}
         onClose={() => setGuideOpen(false)}
       />
+
+      <SleepHowSheet visible={sleepHowOpen} onClose={() => setSleepHowOpen(false)} />
     </View>
   );
 }

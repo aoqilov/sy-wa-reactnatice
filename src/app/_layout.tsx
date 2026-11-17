@@ -4,12 +4,13 @@ import { DarkTheme, DefaultTheme, SplashScreen, Stack, ThemeProvider } from "exp
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { useColorScheme } from "nativewind";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { ProfileProvider, useProfile } from "@/features/profile";
 import { loadSettings, useSettingsLoaded } from "@/shared/settings/settings";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
+import { AppSplash } from "@/widgets/app-splash/AppSplash";
 
 // Saqlangan profil va sozlamalar (til, o'lcham, mavzu) o'qilguncha splash ekran turadi
 // (aks holda bir lahza /login yoki eski mavzu yaltirab ketardi).
@@ -20,18 +21,36 @@ function RootNavigator() {
   const settingsLoaded = useSettingsLoaded();
   const hasProfile = profile !== null;
   const ready = !profileLoading && settingsLoaded;
+  const navigator = <Navigator hasProfile={hasProfile} />;
 
   useEffect(() => {
     loadSettings();
   }, []);
 
-  useEffect(() => {
-    if (ready) SplashScreen.hide();
-  }, [ready]);
+  // Animatsiyali splash (AppSplash) native splash'ni o'zi yopadi va ilova tayyor bo'lgach (kamida ~3 s) so'nadi.
+  const [splashVisible, setSplashVisible] = useState(true);
+  const hideSplash = useCallback(() => setSplashVisible(false), []);
+  const splash = splashVisible ? <AppSplash ready={ready} onDone={hideSplash} /> : null;
 
-  // Web'da splash yo'q, shuning uchun o'qish tugaguncha bo'sh fon ko'rsatamiz.
-  if (!ready) return <View className="flex-1 bg-background" />;
+  // O'qish tugaguncha ostida bo'sh fon turadi.
+  if (!ready) {
+    return (
+      <View className="flex-1 bg-background">
+        {splash}
+      </View>
+    );
+  }
 
+  return (
+    <View className="flex-1">
+      {navigator}
+      {splash}
+    </View>
+  );
+}
+
+// Profil bor — asosiy ilova, yo'q — faqat /login.
+function Navigator({ hasProfile }: { hasProfile: boolean }) {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       {/* Profil bor — asosiy ilova. Profil o'chsa (Log out) foydalanuvchi o'zi /login'ga tushadi. */}

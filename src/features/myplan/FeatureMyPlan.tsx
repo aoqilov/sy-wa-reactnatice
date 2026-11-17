@@ -11,13 +11,16 @@ import { PlanCard } from "./components/plan-card";
 import { RemindersSection } from "./components/reminders-section";
 import { RoutinesSection } from "./components/routines-section";
 import { SyncStatus } from "./components/sync-status";
+import { type EditTarget, WatchRemindersSection } from "./components/watch-reminders-section";
 import { useNow } from "./hooks/use-now";
 import { usePlans } from "./hooks/use-plans";
 import { useReminders } from "./hooks/use-reminders";
 import { useRoutines } from "./hooks/use-routines";
+import { useWatchReminders } from "./hooks/use-watch-reminders";
 import { PlanSheet } from "./modals/plan-sheet";
 import { ReminderSheet } from "./modals/reminder-sheet";
 import { RoutineSheet } from "./modals/routine-sheet";
+import { WatchReminderSheet } from "./modals/watch-reminder-sheet";
 
 const SEND_ERROR: Record<SendFailure, string> = {
   notReady: "Soat ulanmagan. Ulanib, qayta yuboring.",
@@ -26,7 +29,7 @@ const SEND_ERROR: Record<SendFailure, string> = {
   rejected: "Soat ba'zi rejalarni saqlamadi",
 };
 
-type TabKey = "notify" | "routines";
+type TabKey = "notify" | "routines" | "watch";
 
 // Eslatmalar — oddiy bildirishnomalar: soat belgilangan vaqtda matn ko'rsatib tebranadi.
 // Rutinalar — muntazam o'lchash: "o'lchov + necha daqiqada bir marta". Soat intervalni o'zi saqlay olsa (SDK
@@ -34,9 +37,11 @@ type TabKey = "notify" | "routines";
 const TABS: { label: string; value: TabKey }[] = [
   { label: "Eslatmalar", value: "notify" },
   { label: "Rutinalar", value: "routines" },
+  { label: "Soatda", value: "watch" },
 ];
 
-// "Rejam": ikki tab. "Eslatmalar" — soatdagi matnli eslatmalar, "Rutinalar" — muntazam o'lchash jadvali.
+// "Rejam": uch tab. "Eslatmalar" — soatdagi matnli eslatmalar, "Rutinalar" — muntazam o'lchash jadvali, "Soatda" —
+// soatning o'z eslatmalari (harakatsizlik, suv, dori..., puls ogohlantirishi), ilovadan boshqariladi.
 export function FeatureMyPlan() {
   const { metrics, loading } = useMetrics();
   const [tab, setTab] = useState<TabKey>("notify");
@@ -54,6 +59,15 @@ export function FeatureMyPlan() {
   const reminders = useReminders();
   const [reminderSheet, setReminderSheet] = useState({ open: false, nonce: 0 });
   const now = useNow();
+  // Soatning o'z eslatmalari ("Soatda" tabi ochiq bo'lganda o'qiladi).
+  const watchRem = useWatchReminders(tab === "watch");
+  const [watchSheet, setWatchSheet] = useState<{ open: boolean; target: EditTarget | null; nonce: number }>({
+    open: false,
+    target: null,
+    nonce: 0,
+  });
+  const saveWatchReminder = (t: EditTarget) =>
+    t.kind === "health" ? watchRem.setHealth(t.value) : t.kind === "longSeat" ? watchRem.setLongSeat(t.value) : watchRem.setHeart(t.value);
   const tabBarSpace = useTabBarSpace();
 
   // Sheet: ochiq-yopiqligi, qaysi reja tahrirlanayotgani va `nonce`.
@@ -93,7 +107,19 @@ export function FeatureMyPlan() {
         contentContainerStyle={{ paddingBottom: tabBarSpace }}
         keyboardShouldPersistTaps="handled"
       >
-        {tab === "notify" ? (
+        {tab === "watch" ? (
+          <WatchRemindersSection
+            data={watchRem.data}
+            loading={watchRem.loading}
+            saving={watchRem.saving}
+            error={watchRem.error}
+            saveError={watchRem.saveError}
+            connected={watchRem.connected}
+            onRetry={() => void watchRem.read()}
+            onEdit={(target) => setWatchSheet((s) => ({ open: true, target, nonce: s.nonce + 1 }))}
+            onToggle={(t) => void saveWatchReminder({ ...t, value: { ...t.value, on: !t.value.on } } as EditTarget)}
+          />
+        ) : tab === "notify" ? (
           <RemindersSection
             list={reminders.list}
             busy={reminders.busy}
@@ -227,6 +253,15 @@ export function FeatureMyPlan() {
         editingKey={routineSheet.editingKey}
         onSave={routines.upsert}
         onDelete={routines.remove}
+      />
+
+      <WatchReminderSheet
+        key={`watch-${watchSheet.nonce}`}
+        target={watchSheet.target}
+        visible={watchSheet.open}
+        saving={watchRem.saving}
+        onClose={() => setWatchSheet((s) => ({ ...s, open: false }))}
+        onSave={saveWatchReminder}
       />
 
       <ReminderSheet

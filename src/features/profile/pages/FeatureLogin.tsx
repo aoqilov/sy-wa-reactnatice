@@ -31,7 +31,7 @@ export function FeatureLogin() {
       }}
     >
       <View className="items-center gap-3">
-        <CusImage source={LOGO} className="h-16 w-10 rounded-lg" />
+        <CusImage source={LOGO} contentFit="contain" className="h-16 w-11" />
         <CusText variant="title">{t("login.title")}</CusText>
         <CusText tone="muted" className="text-center">
           {t("login.subtitle")}

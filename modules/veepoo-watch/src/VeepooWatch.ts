@@ -52,6 +52,11 @@ declare class VeepooWatchModule extends NativeModule<VeepooWatchEvents> {
    */
   startBodyComp(): void;
   stopBodyComp(): void;
+  /**
+   * Soatning o'zida o'lchangan tana tarkibi natijalari. Hodisa "bodyHistory" `{records: [{at: {y, mo, d, h, mi}, id,
+   * bmi, fatPct, ...}]}` yoki `{unsupported: true}`.
+   */
+  readBodyHistory(): void;
   startCuffBp(rawFlag: boolean): void;
   stopCuffBp(): void;
   /** Soatning o'zida o'lchangan bosim yozuvlarini o'qish: natija "manualBp" hodisasi bilan keladi. `sinceSec` — epoch soniya. */
@@ -99,6 +104,24 @@ declare class VeepooWatchModule extends NativeModule<VeepooWatchEvents> {
 
   /** Bugungi jami. Hodisa "sportStep" {step, kcal, dis (km)}. */
   readSteps(): void;
+  /**
+   * Uyqu (soat saqlagan kunlar). Hodisa "sleepData": `{records: [{day, date, down, up ({y, mo, d, h, mi}), all, deep,
+   * light (daq), wake, quality, line, precise, ...aniq uyqu ballari}]}` har bo'lak uchun, oxirida `{complete}`.
+   */
+  readSleep(): void;
+  /**
+   * Soatdagi salomatlik eslatmalari. Hodisa "healthRemind" {op: "item", item: {type, on, start, end (daqiqa),
+   * interval}} har biri uchun, so'ng {op: "read"}; yoki {op: "readFailed" | "unsupported"}.
+   */
+  readHealthReminds(): void;
+  /** Hodisa "healthRemind" {op: "set", item} yoki {op: "setFailed", type}. */
+  setHealthRemind(type: string, on: boolean, startMin: number, endMin: number, interval: number): void;
+  /** Harakatsizlik eslatmasi (eski API). Hodisa "longSeat" {status, on, start, end, threshold}. */
+  readLongSeat(): void;
+  setLongSeat(on: boolean, startMin: number, endMin: number, threshold: number): void;
+  /** Puls ogohlantirishi. Hodisa "heartWarning" {status, on, high, low}. */
+  readHeartWarning(): void;
+  setHeartWarning(on: boolean, high: number, low: number): void;
   /** Soatga shaxsiy ma'lumot va maqsadlar (kkal/masofa hisobi, maqsad halqasi). Hodisa "personInfo" {status}. */
   syncPersonInfo(male: boolean, heightCm: number, weightKg: number, age: number, stepGoal: number, sleepGoalMin: number): void;
 

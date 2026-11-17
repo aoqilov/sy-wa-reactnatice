@@ -17,6 +17,8 @@ type Props = {
   onInfo: (key: Metric["key"]) => void; // kartadagi "info" belgisi bosilganda
   /** To'r boshidagi qo'shimcha karta (o'lchov emas, masalan "Qadamlar"); kenglik oddiy karta kengligi. */
   leading?: (width: number) => ReactNode;
+  /** `leading` nechta karta chizadi (toq/juft hisobi uchun). */
+  leadingCount?: number;
 };
 
 const PADDING = 16; // chap va o'ng chetdan
@@ -48,12 +50,12 @@ function sparkValues(m: Metric): number[] {
 // O'lchov kartalari: 2 ustunli to'r, ustunlar to'lsa keyingi qatorga tushadi. Toq sondagi oxirgi karta butun qatorni
 // egallaydi. Har bir kartada: nom, qiymat, rangli holat yorlig'i, mini grafik va oxirgi o'lchov vaqti. Karta o'z
 // o'lchovining rangida (constants/metric-colors.ts); holat yorlig'i esa holat rangida (yashil/sariq/qizil).
-export function MetricSelector({ metrics, selectedKey, onSelect, onInfo, leading }: Props) {
+export function MetricSelector({ metrics, selectedKey, onSelect, onInfo, leading, leadingCount = 1 }: Props) {
   const { width } = useWindowDimensions();
 
   const itemWidth = (width - PADDING * 2 - GAP * (COLS - 1)) / COLS;
   const wideWidth = itemWidth * COLS + GAP * (COLS - 1);
-  const total = metrics.length + (leading ? 1 : 0); // to'rdagi jami kartalar (toq bo'lsa oxirgisi keng)
+  const total = metrics.length + (leading ? leadingCount : 0); // to'rdagi jami kartalar (toq bo'lsa oxirgisi keng)
 
   return (
     // Sarlavha ("O'lchovni tanlang") va panel foni FeatureHome'da: ular qotib turadi, faqat shu kartalar scroll bo'ladi.

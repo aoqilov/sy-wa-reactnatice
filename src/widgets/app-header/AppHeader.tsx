@@ -30,7 +30,7 @@ export function AppHeader() {
       style={{ paddingTop: insets.top + 8 }}
     >
       <View className="flex-row items-center gap-2">
-        <CusImage source={LOGO} className="w-5 h-8 rounded-lg" />
+        <CusImage source={LOGO} contentFit="contain" className="h-8 w-[22px]" />
         <CusText variant="heading">synapse-watch</CusText>
       </View>
 

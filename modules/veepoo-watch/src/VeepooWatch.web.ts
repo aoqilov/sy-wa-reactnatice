@@ -39,6 +39,7 @@ class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
   stopMet(): void {}
   startBodyComp(): void {}
   stopBodyComp(): void {}
+  readBodyHistory(): void {}
   startCuffBp(_rawFlag: boolean): void {}
   stopCuffBp(): void {}
   readManualBp(_sinceSec: number): void {}
@@ -63,6 +64,13 @@ class VeepooWatchWeb extends NativeModule<VeepooWatchEvents> {
   }
 
   readSteps(): void {}
+  readSleep(): void {}
+  readHealthReminds(): void {}
+  setHealthRemind(): void {}
+  readLongSeat(): void {}
+  setLongSeat(): void {}
+  readHeartWarning(): void {}
+  setHeartWarning(): void {}
   syncPersonInfo(): void {}
 
   readAutoMeasure(): void {}

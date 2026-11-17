@@ -20,6 +20,8 @@ type Props = {
   goals: ActivityGoals;
   ready: boolean;
   onSaveGoals: (goals: ActivityGoals) => void;
+  /** Qadamlar tarixi sahifasi (/history/steps). */
+  onDetails: () => void;
 };
 
 const SIZE = 264; // o'lchash doirasi (MeasureCircle) bilan bir xil: almashganda joy sakramaydi
@@ -28,7 +30,7 @@ const NUMBER_STYLE = { fontSize: 50, lineHeight: 62 } as const;
 
 // "Qadamlar" kartasi tanlanganda o'lchash doirasi o'rnida: katta maqsad halqasi (qadam / maqsad, foiz), ostida
 // kkal, masofa va "Maqsad" tugmasi. Ma'lumot soatdan (FeatureHome → useTodayActivity).
-export function StepsHero({ today, goals, ready, onSaveGoals }: Props) {
+export function StepsHero({ today, goals, ready, onSaveGoals, onDetails }: Props) {
   const t = useT();
   const [goalOpen, setGoalOpen] = useState(false);
   const has = today !== null;
@@ -82,16 +84,29 @@ export function StepsHero({ today, goals, ready, onSaveGoals }: Props) {
           value={has ? dist.value : "--"}
           unit={dist.unit}
         />
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setGoalOpen(true)}
-          className="flex-1 items-center justify-center gap-1 rounded-xl border border-border bg-surface px-3 py-2 active:bg-surface-alt"
-        >
-          <Octicons name="pencil" size={16} color={STEPS_COLOR} />
-          <CusText variant="caption" className="font-semibold">
-            {t("activity.goal")}
-          </CusText>
-        </Pressable>
+        {/* Maqsad va Batafsil (qadamlar tarixi) bitta ustunda: qator kengligi o'zgarmaydi */}
+        <View className="flex-1 gap-1.5">
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setGoalOpen(true)}
+            className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-2 active:bg-surface-alt"
+          >
+            <Octicons name="pencil" size={13} color={STEPS_COLOR} />
+            <CusText variant="caption" className="font-semibold" numberOfLines={1}>
+              {t("activity.goal")}
+            </CusText>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onDetails}
+            className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-2 active:bg-surface-alt"
+          >
+            <Octicons name="graph" size={13} color={STEPS_COLOR} />
+            <CusText variant="caption" className="font-semibold" numberOfLines={1}>
+              {t("sleep.details")}
+            </CusText>
+          </Pressable>
+        </View>
       </View>
 
       <GoalSheet

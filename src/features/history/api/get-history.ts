@@ -121,5 +121,7 @@ export function mergeHistory(app: HistoryReading[], watch: HistoryReading[]): Hi
 
 export async function getHistory(): Promise<{ metrics: Metric[]; readings: HistoryReading[] }> {
   const [metrics, app, watch] = await Promise.all([getMetrics(), loadReadings(), loadWatchHistory()]);
-  return { metrics, readings: mergeHistory(app.map(fromApp), watch.map(fromWatch)) };
+  // Avval saqlangan HRV yozuvlari ko'rsatilmaydi (HRV olib tashlangan).
+  const shown = mergeHistory(app.map(fromApp), watch.map(fromWatch)).filter((r) => r.key !== "hrv");
+  return { metrics, readings: shown };
 }

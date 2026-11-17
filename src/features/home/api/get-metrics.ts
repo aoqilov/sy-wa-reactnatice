@@ -49,7 +49,7 @@ const METRICS: MetricInfo[] = [
   // Qiymat — EKG o'lchovidagi puls; HRV va QTc tafsilotlarda (lib/readings.ts).
   { key: "ecg", title: "EKG", icon: "graph", unit: "zarb/daq", normalRange: "60-100 zarb/daq" },
   // Soat 5 ta ko'rsatkich beradi (lipidlar va siydik kislotasi); qiymat o'rnida — nechtasi me'yorda, hammasi
-  // doira ostidagi bitta kartada (components/blood-result.tsx).
+  // Tarix sahifasida (qon tahlili tarixi kartasi).
   {
     key: "blood",
     title: "Qon tahlili",
@@ -58,8 +58,7 @@ const METRICS: MetricInfo[] = [
     normalRange: "Xolesterin < 5.2, triglitseridlar < 1.7, HDL > 1.0, LDL < 3.4 mmol/l; siydik kislotasi 150-420 µmol/l",
   },
   { key: "sugar", title: "Shakar", icon: "sparkle", unit: "mmol/l", normalRange: "3.9-5.6 mmol/l (och qoringa)" },
-  // Yurak urishlari orasidagi vaqt o'zgaruvchanligi: yoshga va odamga qarab juda farq qiladi.
-  { key: "hrv", title: "HRV", icon: "heart-fill", unit: "ms", normalRange: "Odatda 20-100 ms (yoshga bog'liq, yuqori yaxshi)" },
+  // HRV alohida o'lchov sifatida olib tashlangan (2026-11-16); EKG hisobotidagi HRV qiymati qoladi.
   // Soatning stress indeksi (0..100), optik datchik bo'yicha.
   { key: "stress", title: "Stress", icon: "smiley", unit: "/ 100", normalRange: "0-50: me'yorda, 50 dan yuqori: ko'tarilgan" },
   // Tana tarkibi elektrod orqali (bioimpedans), taxminiy. Qiymat — yog' ulushi; qolganlari natija qatorida.

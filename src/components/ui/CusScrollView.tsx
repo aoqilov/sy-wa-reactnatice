@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { LayoutChangeEvent, ScrollView, ScrollViewProps } from "react-native";
 
 // Vertikal scroll "auto" rejimida: mazmun ekranga sig'sa scroll ham, tebranish (bounce) ham,
@@ -7,7 +7,7 @@ export function CusScrollView({
   onLayout,
   onContentSizeChange,
   ...rest
-}: ScrollViewProps) {
+}: ScrollViewProps & { ref?: ComponentProps<typeof ScrollView>["ref"] }) {
   const [viewH, setViewH] = useState(0);
   const [contentH, setContentH] = useState(0);
 

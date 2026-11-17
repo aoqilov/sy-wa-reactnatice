@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { CusButton, CusCard, CusListItem, CusText } from "@/components/ui";
+import { CusButton, CusCard, CusImage, CusListItem, CusText } from "@/components/ui";
 import { useT } from "@/shared/i18n/use-t";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 import { type LastWatch, loadLastWatch } from "@/shared/watch/last-watch";
@@ -11,6 +11,7 @@ import { rememberWatchName, useWatchConnection } from "@/shared/watch/watch-conn
 import { useWatchLog } from "@/shared/watch/watch-log";
 import { type ScanProblem, useWatchScanner } from "@/shared/watch/use-watch-scanner";
 
+const APP_ICON = require("../../../assets/images/icon.png");
 const LOG_SHOWN = 60; // ulanish ekranida jurnalning oxirgi qatorlari (to'liq jurnal `/watch` panelida)
 
 const PROBLEM_TEXT = {
@@ -30,7 +31,6 @@ export function WatchConnectScreen({ onDevSkip }: { onDevSkip?: () => void }) {
   const log = useWatchLog();
   const [showLog, setShowLog] = useState(false);
   const [last, setLast] = useState<LastWatch | null>(null);
-  const primary = useThemeColor("primary", "#1E6FEB");
   const muted = useThemeColor("muted", "#6B7385");
 
   useEffect(() => {
@@ -49,8 +49,14 @@ export function WatchConnectScreen({ onDevSkip }: { onDevSkip?: () => void }) {
       contentContainerStyle={{ paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }}
       keyboardShouldPersistTaps="handled"
     >
-      <View className="h-20 w-20 items-center justify-center rounded-full bg-primary-soft">
-        {connecting ? <ActivityIndicator color={primary} /> : <Octicons name="clock" size={36} color={primary} />}
+      {/* Ilova ikonkasi; ulanayotganda ustida spinner */}
+      <View className="h-24 w-24 items-center justify-center">
+        <CusImage source={APP_ICON} contentFit="contain" className="h-24 w-24 rounded-3xl" />
+        {connecting ? (
+          <View className="absolute inset-0 items-center justify-center rounded-3xl bg-black/25">
+            <ActivityIndicator color="#FFFFFF" />
+          </View>
+        ) : null}
       </View>
 
       <CusText variant="title" className="text-center">

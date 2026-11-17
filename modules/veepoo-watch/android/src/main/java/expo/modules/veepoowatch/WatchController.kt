@@ -24,6 +24,7 @@ import com.veepoo.protocol.listener.data.ICustomSettingDataListener
 import com.inuker.bluetooth.library.connect.response.BleWriteResponse
 import com.veepoo.protocol.listener.data.IBloodComponentDetectListener
 import com.veepoo.protocol.listener.data.IBodyComponentDetectListener
+import com.veepoo.protocol.listener.data.IBodyComponentReadDataListener
 import com.veepoo.protocol.listener.data.IHrvDetectListener
 import com.veepoo.protocol.listener.data.IMetDetectListener
 import com.veepoo.protocol.listener.data.IPressureDetectListener
@@ -66,6 +67,15 @@ import com.veepoo.protocol.model.enums.EFunctionStatus
 import com.veepoo.protocol.model.enums.EPwdStatus
 import com.veepoo.protocol.model.enums.ESocailMsg
 import com.veepoo.protocol.model.settings.AllSetSetting
+import com.veepoo.protocol.model.settings.LongSeatSetting
+import com.veepoo.protocol.model.settings.HeartWaringSetting
+import com.veepoo.protocol.model.datas.LongSeatData
+import com.veepoo.protocol.model.datas.HeartWaringData
+import com.veepoo.protocol.model.datas.HealthRemind
+import com.veepoo.protocol.model.enums.HealthRemindType
+import com.veepoo.protocol.listener.IHealthRemindListener
+import com.veepoo.protocol.listener.data.ILongSeatDataListener
+import com.veepoo.protocol.listener.data.IHeartWaringDataListener
 import com.veepoo.protocol.model.settings.ContentSocailSetting
 import com.veepoo.protocol.model.settings.ContentPhoneSetting
 import com.veepoo.protocol.listener.data.IPhoneListener
@@ -81,6 +91,9 @@ import com.veepoo.protocol.listener.data.IOriginData3Listener
 import com.veepoo.protocol.listener.data.IOriginDataListener
 import com.veepoo.protocol.listener.data.IOriginProgressListener
 import com.veepoo.protocol.listener.data.ITextAlarmDataListener
+import com.veepoo.protocol.listener.data.ISleepDataListener
+import com.veepoo.protocol.model.datas.SleepData
+import com.veepoo.protocol.model.datas.SleepPrecisionData
 import com.veepoo.protocol.model.datas.HRVOriginData
 import com.veepoo.protocol.model.datas.OriginData
 import com.veepoo.protocol.model.datas.OriginData3
@@ -419,6 +432,7 @@ class WatchController(
             "bloodGlucoseAdjusting" to data?.bloodGlucoseAdjusting?.name,
             "bloodGlucoseMultipleAdjusting" to data?.bloodGlucoseMultipleAdjusting?.name,
             "bloodComponent" to data?.bloodComponent?.name,
+            "precisionSleep" to data?.precisionSleep?.name,
           )
         }
 
@@ -432,7 +446,11 @@ class WatchController(
 
         override fun onDeviceFunctionPackage2Report(data: DeviceFunctionPackage2?) {
           // Yostiqchali bosim buyrug'i shu imkoniyatga bog'liq (startCuffBp izohiga qarang).
-          emitData("features", "sportModel" to data?.sportModelFunction?.name)
+          emitData(
+            "features",
+            "sportModel" to data?.sportModelFunction?.name,
+            "precisionSleep" to data?.precisionSleepFunction?.name,
+          )
         }
 
         override fun onDeviceFunctionPackage3Report(data: DeviceFunctionPackage3?) {
@@ -923,17 +941,59 @@ class WatchController(
     manager.stopDetectBodyComponent(bleWriter("stopDetectBodyComponent"))
   }
 
+  /**
+   * BodyComponent'ning 14 ta qiymati. Birliklar maydon nomlari bo'yicha (SDK hujjatida yozilmagan): fatKg, ffmKg,
+   * waterKg, proteinKg — kg; subFatPct, skeletalPct, proteinPct — %. JS (shared/watch/measure.ts) oraliqni tekshiradi.
+   */
   private fun bodyParts(b: BodyComponent): Array<Pair<String, Any?>> {
     val r = { v: Float -> Math.round(v * 10.0) / 10.0 }
     return arrayOf(
       "bmi" to r(b.BMI),
       "fatPct" to r(b.bodyFatRate),
+      "fatKg" to r(b.fatRate),
+      "ffmKg" to r(b.FFM),
       "musclePct" to r(b.muscleRate),
       "muscleKg" to r(b.muscleMass),
+      "subFatPct" to r(b.subcutaneousFat),
       "waterPct" to r(b.bodyWater),
+      "waterKg" to r(b.waterContent),
+      "skeletalPct" to r(b.skeletalMuscleRate),
       "boneKg" to r(b.boneMass),
+      "proteinPct" to r(b.proteinProportion),
+      "proteinKg" to r(b.proteinMass),
       "bmr" to r(b.basalMetabolicRate),
     )
+  }
+
+  /**
+   * Soatning o'zida o'lchangan tana tarkibi natijalari. Hodisa "bodyHistory" `{records: [{at: {y, mo, d, h, mi},
+   * id, ...bodyParts}]}`; qo'llanmasa `{unsupported: true}`. Tinglovchi Proxy orqali: SDK interfeysi Kotlin'da
+   * (List yoki MutableList ekanini bilmaymiz), Proxy ikkalasida ham kompilyatsiya bo'ladi.
+   */
+  fun readBodyHistory() = safe("readBodyHistory") {
+    if (!requireReady("readBodyHistory")) return@safe
+    if (!VpSpGetUtil.getVpSpVariInstance(appContext).isSupportBodyComponent()) {
+      emitData("bodyHistory", "unsupported" to true)
+      return@safe
+    }
+    val iface = IBodyComponentReadDataListener::class.java
+    val listener = java.lang.reflect.Proxy.newProxyInstance(iface.classLoader, arrayOf(iface)) { proxy, method, args ->
+      when (method.name) {
+        "readBodyComponentDataFinish" -> {
+          val list = (args?.getOrNull(0) as? List<*>).orEmpty().filterIsInstance<BodyComponent>()
+          emitData(
+            "bodyHistory",
+            "records" to list.map { b -> mapOf<String, Any?>("at" to timeMap(b.timeBean), "id" to b.id, *bodyParts(b)) },
+          )
+          null
+        }
+        "hashCode" -> System.identityHashCode(proxy)
+        "equals" -> proxy === args?.getOrNull(0)
+        "toString" -> "BodyHistoryListener"
+        else -> null
+      }
+    } as IBodyComponentReadDataListener
+    manager.readBodyComponentData(bleWriter("readBodyComponentData"), listener)
   }
 
   /** Ba'zi SDK metodlari (qon tahlili) inuker kutubxonasining `BleWriteResponse` ini kutadi. */
@@ -1191,6 +1251,10 @@ class WatchController(
       "sys" to d.highValue.takeIf { it > 0 },
       "dia" to d.lowValue.takeIf { it > 0 },
       "temp" to d.temperature.takeIf { it > 0 },
+      // Faollik: shu 5 daqiqadagi qadam, kkal, masofa (History'dagi kunlik qadamlar shundan yig'iladi).
+      "step" to d.stepValue.takeIf { it > 0 },
+      "cal" to d.calValue.takeIf { it > 0 },
+      "dis" to d.disValue.takeIf { it > 0 },
     )
 
     // Kun bo'yicha jami paketlar: JS bugungi kunni keyingi safar shu joydan davom ettiradi.
@@ -1491,6 +1555,187 @@ class WatchController(
         emitData("sportStep", "step" to data.step, "kcal" to data.kcal, "dis" to data.dis)
       }
     })
+  }
+
+  // ---------------------------------------------------------------- uyqu
+  //
+  // readSleepData(w, listener, watchDays) → har bir uyqu bo'lagi uchun onSleepDataChange(kun, SleepData). Soatda aniq
+  // uyqu bo'lsa obyekt SleepPrecisionData bo'ladi. sleepLine: oddiy uyquda belgi = 5 daqiqa (0 yengil, 1 chuqur,
+  // 2 uyg'oq), aniq uyquda belgi = onePointDuration soniya, hozir 60 (0 chuqur, 1 yengil, 2 REM, 3 uyqusizlik,
+  // 4 uyg'oq). Hodisa "sleepData": {records} har bo'lak uchun, oxirida {complete}.
+
+  private fun timeMap(t: TimeData?): Map<String, Any?>? = t?.let {
+    mapOf("y" to it.getYear(), "mo" to it.getMonth(), "d" to it.getDay(), "h" to it.getHour(), "mi" to it.getMinute())
+  }
+
+  private fun sleepRecord(day: String?, d: SleepData): Map<String, Any?> {
+    val base = mapOf<String, Any?>(
+      "day" to day,
+      "date" to d.getDate(),
+      "down" to timeMap(d.getSleepDown()),
+      "up" to timeMap(d.getSleepUp()),
+      "all" to d.getAllSleepTime(),
+      "deep" to d.getDeepSleepTime(),
+      "light" to d.getLowSleepTime(),
+      "wake" to d.getWakeCount(),
+      "quality" to d.getSleepQulity(),
+      "line" to d.getSleepLine(),
+      "precise" to (d is SleepPrecisionData),
+    )
+    if (d !is SleepPrecisionData) return base
+    return base + mapOf(
+      "pointSec" to d.getOnePointDuration(),
+      "accurateType" to d.getAccurateType(),
+      "getUpScore" to d.getGetUpScore(),
+      "deepScore" to d.getDeepScore(),
+      "efficiencyScore" to d.getSleepEfficiencyScore(),
+      "fallAsleepScore" to d.getFallAsleepScore(),
+      "timeScore" to d.getSleepTimeScore(),
+      "insomniaScore" to d.getInsomniaScore(),
+      "insomniaTimes" to d.getInsomniaTimes(),
+      "insomniaMin" to d.getInsomniaDuration(),
+      "firstDeepMin" to d.getFirstDeepDuration(),
+      "getUpMin" to d.getGetUpDuration(),
+      "otherMin" to d.getOtherDuration(),
+      "laster" to d.getLaster(),
+      "next" to d.getNext(),
+    )
+  }
+
+  fun readSleep() = safe("readSleep") {
+    if (!requireReady("readSleep")) return@safe
+    manager.readSleepData(writer("readSleepData"), object : ISleepDataListener {
+      override fun onSleepDataChange(day: String?, data: SleepData?) {
+        if (data == null) return
+        try {
+          emitData("sleepData", "records" to listOf(sleepRecord(day, data)))
+        } catch (t: Throwable) {
+          emitData("error", "op" to "sleepRecord", "message" to (t.message ?: t.javaClass.simpleName))
+        }
+      }
+
+      override fun onSleepProgress(progress: Float) = Unit
+      override fun onSleepProgressDetail(day: String?, packageNumber: Int) = Unit
+
+      override fun onReadSleepComplete() {
+        emitData("sleepData", "complete" to true)
+      }
+    }, watchDays.coerceAtLeast(1))
+  }
+
+  // ---- Soatdagi eslatmalar: salomatlik eslatmalari, harakatsizlik (long seat), puls ogohlantirishi ----
+  // SDK tinglovchilari Proxy orqali: IHealthRemindListener Kotlin interfeysi (parametr nullability'si noma'lum),
+  // Proxy har qanday imzoda kompilyatsiya bo'ladi.
+
+  private fun <T> listenerProxy(iface: Class<T>, onCall: (String, Array<out Any?>?) -> Unit): T {
+    val handler = java.lang.reflect.InvocationHandler { proxy, method, args ->
+      when (method.name) {
+        "hashCode" -> System.identityHashCode(proxy)
+        "equals" -> proxy === args?.getOrNull(0)
+        "toString" -> iface.simpleName
+        else -> {
+          try {
+            onCall(method.name, args)
+          } catch (t: Throwable) {
+            emitData("error", "op" to iface.simpleName, "message" to (t.message ?: t.javaClass.simpleName))
+          }
+          null
+        }
+      }
+    }
+    return iface.cast(java.lang.reflect.Proxy.newProxyInstance(iface.classLoader, arrayOf(iface), handler))!!
+  }
+
+  private fun minutesOf(t: TimeData?): Int? = t?.let { it.hour * 60 + it.minute }
+
+  private fun timeOf(min: Int): TimeData = TimeData().apply {
+    hour = (min / 60).coerceIn(0, 23)
+    minute = (min % 60).coerceIn(0, 59)
+  }
+
+  private fun healthRemindMap(h: HealthRemind): Map<String, Any?> = mapOf(
+    "type" to h.remindType?.name,
+    "on" to h.status,
+    "start" to minutesOf(h.startTime),
+    "end" to minutesOf(h.endTime),
+    "interval" to h.interval,
+  )
+
+  /**
+   * Hodisa "healthRemind" {op}: "item" {item} — har bir eslatma, "read" — o'qish tugadi, "readFailed", "unsupported",
+   * "set" {item} — saqlandi, "setFailed" {type}, "report" {item} — soatda o'zgartirildi.
+   */
+  private fun healthListener(): IHealthRemindListener = listenerProxy(IHealthRemindListener::class.java) { name, args ->
+    val h = args?.getOrNull(0) as? HealthRemind
+    when (name) {
+      "onHealthRemindRead" -> if (h != null) emitData("healthRemind", "op" to "item", "item" to healthRemindMap(h))
+      "onHealthRemindReadingComplete" -> emitData("healthRemind", "op" to "read")
+      "onHealthRemindReadFailed" -> emitData("healthRemind", "op" to "readFailed")
+      "functionNotSupport" -> emitData("healthRemind", "op" to "unsupported")
+      "onHealthRemindSettingSuccess" -> emitData("healthRemind", "op" to "set", "item" to h?.let { healthRemindMap(it) })
+      "onHealthRemindSettingFailed" ->
+        emitData("healthRemind", "op" to "setFailed", "type" to (args?.getOrNull(0) as? HealthRemindType)?.name)
+      "onHealthRemindReport" -> if (h != null) emitData("healthRemind", "op" to "report", "item" to healthRemindMap(h))
+      "onHealthRemindReportFailed" -> emitData("healthRemind", "op" to "reportFailed")
+    }
+  }
+
+  /** Salomatlik eslatmalari: harakatsizlik, suv, ko'z, sport, dori, o'qish, tashqariga chiqish, qo'l yuvish. */
+  fun readHealthReminds() = safe("readHealthReminds") {
+    if (!requireReady("readHealthReminds")) return@safe
+    manager.readHealthRemind(HealthRemindType.ALL, healthListener(), writer("readHealthRemind"))
+  }
+
+  /** `type` — HealthRemindType nomi; vaqtlar kun boshidan daqiqada; `interval` — daqiqa. */
+  fun setHealthRemind(type: String, on: Boolean, startMin: Int, endMin: Int, interval: Int) = safe("setHealthRemind") {
+    if (!requireReady("setHealthRemind")) return@safe
+    val remind = HealthRemind(HealthRemindType.valueOf(type), timeOf(startMin), timeOf(endMin), interval, on)
+    manager.settingHealthRemind(remind, healthListener(), writer("settingHealthRemind"))
+  }
+
+  /** Hodisa "longSeat" {status, on, start, end (daqiqa), threshold (daqiqa)}. */
+  private fun longSeatListener(): ILongSeatDataListener = listenerProxy(ILongSeatDataListener::class.java) { _, args ->
+    val d = args?.getOrNull(0) as? LongSeatData
+    if (d != null) {
+      emitData(
+        "longSeat",
+        "status" to d.status?.name,
+        "on" to d.isOpen,
+        "start" to d.startHour * 60 + d.startMinute,
+        "end" to d.endHour * 60 + d.endMinute,
+        "threshold" to d.threshold,
+      )
+    }
+  }
+
+  fun readLongSeat() = safe("readLongSeat") {
+    if (!requireReady("readLongSeat")) return@safe
+    manager.readLongSeat(writer("readLongSeat"), longSeatListener())
+  }
+
+  fun setLongSeat(on: Boolean, startMin: Int, endMin: Int, threshold: Int) = safe("setLongSeat") {
+    if (!requireReady("setLongSeat")) return@safe
+    val setting = LongSeatSetting(startMin / 60, startMin % 60, endMin / 60, endMin % 60, threshold, on)
+    manager.settingLongSeat(writer("settingLongSeat"), setting, longSeatListener())
+  }
+
+  /** Hodisa "heartWarning" {status, on, high, low} — puls shu chegaralardan chiqsa soat ogohlantiradi. */
+  private fun heartWarningListener(): IHeartWaringDataListener =
+    listenerProxy(IHeartWaringDataListener::class.java) { _, args ->
+      val d = args?.getOrNull(0) as? HeartWaringData
+      if (d != null) {
+        emitData("heartWarning", "status" to d.status?.name, "on" to d.isOpen, "high" to d.heartHigh, "low" to d.heartLow)
+      }
+    }
+
+  fun readHeartWarning() = safe("readHeartWarning") {
+    if (!requireReady("readHeartWarning")) return@safe
+    manager.readHeartWarning(writer("readHeartWarning"), heartWarningListener())
+  }
+
+  fun setHeartWarning(on: Boolean, high: Int, low: Int) = safe("setHeartWarning") {
+    if (!requireReady("setHeartWarning")) return@safe
+    manager.settingHeartWarning(writer("settingHeartWarning"), heartWarningListener(), HeartWaringSetting(high, low, on))
   }
 
   fun syncPersonInfo(male: Boolean, heightCm: Int, weightKg: Int, age: Int, stepGoal: Int, sleepGoalMin: Int) =

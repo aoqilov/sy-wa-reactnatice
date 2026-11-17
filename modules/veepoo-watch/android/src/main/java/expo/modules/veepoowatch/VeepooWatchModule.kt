@@ -108,6 +108,7 @@ class VeepooWatchModule : Module() {
     Function("stopMet") { controller().stopMet() }
     Function("startBodyComp") { controller().startBodyComp() }
     Function("stopBodyComp") { controller().stopBodyComp() }
+    Function("readBodyHistory") { controller().readBodyHistory() }
     Function("startCuffBp") { rawFlag: Boolean -> controller().startCuffBp(rawFlag) }
     Function("stopCuffBp") { controller().stopCuffBp() }
     Function("readManualBp") { sinceSec: Int -> controller().readManualBp(sinceSec) }
@@ -136,6 +137,17 @@ class VeepooWatchModule : Module() {
     Function("endIncomingCall") { controller().endIncomingCall() }
     // Faollik: bugungi qadam/kkal/masofa va soatga shaxsiy ma'lumot + maqsadlar
     Function("readSteps") { controller().readSteps() }
+    Function("readSleep") { controller().readSleep() }
+    Function("readHealthReminds") { controller().readHealthReminds() }
+    Function("setHealthRemind") { type: String, on: Boolean, startMin: Int, endMin: Int, interval: Int ->
+      controller().setHealthRemind(type, on, startMin, endMin, interval)
+    }
+    Function("readLongSeat") { controller().readLongSeat() }
+    Function("setLongSeat") { on: Boolean, startMin: Int, endMin: Int, threshold: Int ->
+      controller().setLongSeat(on, startMin, endMin, threshold)
+    }
+    Function("readHeartWarning") { controller().readHeartWarning() }
+    Function("setHeartWarning") { on: Boolean, high: Int, low: Int -> controller().setHeartWarning(on, high, low) }
     Function("syncPersonInfo") { male: Boolean, heightCm: Int, weightKg: Int, age: Int, stepGoal: Int, sleepGoalMin: Int ->
       controller().syncPersonInfo(male, heightCm, weightKg, age, stepGoal, sleepGoalMin)
     }

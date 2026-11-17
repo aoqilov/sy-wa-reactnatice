@@ -2,7 +2,9 @@ import watchModule, { type WatchEvent } from "../../../modules/veepoo-watch";
 import { getJSON, setJSON } from "../storage/storage";
 import { type BloodParts, type GlucoseRisk, isMeasuring } from "./measure";
 import { getWatchConnection } from "./watch-connection";
+import { mergeStepPoints, stepPointOf, type StepPoint } from "./step-history";
 import { logWatch } from "./watch-log";
+import { runWatchTask } from "./watch-queue";
 
 // History sinxroni: soat xotirasida saqlangan o'lchovlar (soatning o'zida yoki ilovadan o'lchanganlar). Andoza —
 // `synapse-soat` dagi `loadHistory` (veb ilova): oxirgi kunlarning yozuvlari tur bo'yicha o'qiladi. Android SDK bir
@@ -23,7 +25,8 @@ export type SyncResult = { ok: true; added: number } | { ok: false; reason: Sync
 /** notReady — soat ulanmagan; busy — o'lchov ketyapti; outdated — eski APK; noReply / failed — soat javob bermadi. */
 export type SyncFailure = "notReady" | "busy" | "outdated" | "noReply" | "failed";
 
-const KINDS: WatchRecordKind[] = ["bp", "hr", "spo2", "temp", "glucose", "blood", "hrv"];
+// "hrv" o'qilmaydi: HRV alohida o'lchov sifatida olib tashlangan.
+const KINDS: WatchRecordKind[] = ["bp", "hr", "spo2", "temp", "glucose", "blood"];
 const RECORDS_KEY = "watchHistory.v1";
 const SYNCED_AT_KEY = "watchHistory.syncedAt";
 const KEEP_DAYS = 30;
@@ -218,6 +221,12 @@ function bucketContinuous(records: WatchRecord[]): WatchRecord[] {
  * 5 daqiqalik ma'lumot (`readDailyData`, soat saqlagan kunlar, odatda 3).
  */
 export async function syncWatchHistory(days: number): Promise<SyncResult> {
+  // Uyqu kabi boshqa uzun o'qish ketayotgan bo'lsa, soatga parallel so'rov yubormaymiz.
+  const result = await runWatchTask("history", () => syncHistoryInner(days));
+  return result ?? { ok: false, reason: "busy" };
+}
+
+async function syncHistoryInner(days: number): Promise<SyncResult> {
   const watch = watchModule;
   if (!watch || getWatchConnection().status !== "ready") return { ok: false, reason: "notReady" };
   if (isMeasuring()) return { ok: false, reason: "busy" };
@@ -249,12 +258,15 @@ export async function syncWatchHistory(days: number): Promise<SyncResult> {
   let daily: ReadOutcome = "failed";
   /** Avto yozuvlari almashtiriladigan vaqt oraliqlari [from, to): shu oraliqdagi eski avto yozuvlar o'chadi. */
   let replace: [number, number][] = [];
+  /** Kunlik ma'lumotdagi qadamlar (5 daqiqalik): History'dagi kunlik qadamlar uchun alohida saqlanadi. */
+  const steps: StepPoint[] = [];
   if (getWatchConnection().status === "ready" && !isMeasuring()) {
     if (typeof watch.readDailyDay === "function") {
       const inc = await readDailyIncremental();
       daily = inc.outcome;
       replace = inc.replace;
       found.push(...inc.records);
+      steps.push(...inc.steps);
     } else if (typeof watch.readDailyData === "function") {
       const auto: WatchRecord[] = [];
       daily = await readStream(
@@ -262,7 +274,11 @@ export async function syncWatchHistory(days: number): Promise<SyncResult> {
         () => watch.readDailyData(days),
         (e) => {
           if (!Array.isArray(e.records)) return;
-          for (const raw of e.records as Record<string, unknown>[]) auto.push(...fromDaily(raw));
+          for (const raw of e.records as Record<string, unknown>[]) {
+            auto.push(...fromDaily(raw));
+            const sp = stepPointOf(raw);
+            if (sp) steps.push(sp);
+          }
         },
         DAILY_IDLE_MS,
         DAILY_MAX_MS,
@@ -270,6 +286,11 @@ export async function syncWatchHistory(days: number): Promise<SyncResult> {
       found.push(...bucketContinuous(auto));
       if (daily === "complete") replace = [[Date.now() - days * DAY_MS, Infinity]];
     }
+  }
+
+  if (steps.length > 0) {
+    const days = await mergeStepPoints(steps);
+    logWatch(`[steps] ${steps.length} ta 5 daqiqalik yozuv, ${days} kun yangilandi`);
   }
 
   if (manual !== "complete" && daily !== "complete" && found.length === 0) {
@@ -321,9 +342,14 @@ const startOfDay = (offset: number) => {
  * Endi: o'tgan kunlar bir marta to'liq o'qiladi (ular o'zgarmaydi), bugun esa oxirgi o'qilgan joydan
  * (1 soat orqadan) davom etadi. Natijadagi `replace` — shu o'qishda yangilangan vaqt oraliqlari.
  */
-async function readDailyIncremental(): Promise<{ outcome: ReadOutcome; records: WatchRecord[]; replace: [number, number][] }> {
+async function readDailyIncremental(): Promise<{
+  outcome: ReadOutcome;
+  records: WatchRecord[];
+  replace: [number, number][];
+  steps: StepPoint[];
+}> {
   const watch = watchModule;
-  if (!watch) return { outcome: "failed", records: [], replace: [] };
+  if (!watch) return { outcome: "failed", records: [], replace: [], steps: [] };
   const saved = await getJSON<DailyCursor>(CURSOR_KEY);
   const today = dateKey(new Date());
   const cursor: DailyCursor = {
@@ -335,6 +361,7 @@ async function readDailyIncremental(): Promise<{ outcome: ReadOutcome; records: 
 
   const records: WatchRecord[] = [];
   const replace: [number, number][] = [];
+  const steps: StepPoint[] = [];
   let outcome: ReadOutcome = "failed";
 
   const readDay = async (day: number, position: number) => {
@@ -347,7 +374,12 @@ async function readDailyIncremental(): Promise<{ outcome: ReadOutcome; records: 
         if (typeof e.allPackage === "number") total = Math.max(total ?? 0, e.allPackage);
         if (typeof e.watchDays === "number" && e.watchDays > 0) cursor.watchDays = e.watchDays;
         if (!Array.isArray(e.records)) return;
-        for (const raw of e.records as Record<string, unknown>[]) auto.push(...fromDaily(raw));
+        for (const raw of e.records as Record<string, unknown>[]) {
+          auto.push(...fromDaily(raw));
+          // Qadamlar kalit (vaqt) bo'yicha yoziladi: qisman yoki qayta o'qilgan kun ham to'g'ri yig'iladi.
+          const sp = stepPointOf(raw);
+          if (sp) steps.push(sp);
+        }
       },
       DAILY_IDLE_MS,
       DAILY_MAX_MS,
@@ -400,5 +432,5 @@ async function readDailyIncremental(): Promise<{ outcome: ReadOutcome; records: 
     return new Date(y, m - 1, d).getTime() >= oldest;
   });
   await setJSON(CURSOR_KEY, cursor);
-  return { outcome, records, replace };
+  return { outcome, records, replace, steps };
 }

@@ -1,9 +1,10 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useWatchConnection } from "@/shared/watch/watch-connection";
 
-import { type DialInfo, loadMarket, type MarketResult, readDialInfo } from "../api/dials";
+import { type DialInfo, loadMarket, type MarketDial, type MarketResult, readDialInfo } from "../api/dials";
+import { type InstalledDial, loadInstalledDials, rememberInstalledDial } from "../api/installed-dials";
 
 type Load = { status: "loading" } | { status: "done"; result: MarketResult; info: DialInfo | null };
 
@@ -17,6 +18,23 @@ export function useDialMarket() {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   // Shu sessiyada o'rnatilgan siferblat (soat CRC'si qayta o'qilguncha "O'rnatilgan" shu bo'yicha).
   const [installedCrc, setInstalledCrc] = useState<string | null>(null);
+  // Ilova orqali oldin o'rnatilganlar (telefonda saqlanadi), eng yangisi birinchi.
+  const [history, setHistory] = useState<InstalledDial[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    void loadInstalledDials().then((list) => {
+      if (alive) setHistory(list);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const markInstalled = useCallback((dial: MarketDial) => {
+    setInstalledCrc(dial.crc);
+    void rememberInstalledDial(dial).then(setHistory);
+  }, []);
 
   const reload = useCallback(async () => {
     setLoad({ status: "loading" });
@@ -32,5 +50,5 @@ export function useDialMarket() {
     }, [status, reload]),
   );
 
-  return { load, reload, installedCrc, setInstalledCrc, connected: status === "ready" };
+  return { load, reload, installedCrc, markInstalled, history, connected: status === "ready" };
 }

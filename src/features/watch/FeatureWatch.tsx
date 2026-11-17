@@ -192,18 +192,20 @@ export function FeatureWatch() {
               : t("watchInfo.autoMeasure.unsupported")}
           </CusText>
         ) : (
-          info.autoMeasure.map((item) => (
-            <Row
-              key={item.type}
-              label={AUTO_TYPE_LABEL[item.type] ? t(AUTO_TYPE_LABEL[item.type]) : item.type}
-              value={
-                item.on
-                  ? `${t("watchInfo.autoMeasure.every", { min: item.intervalMin })} · ${hhmm(item.startMin)}–${hhmm(item.endMin)}`
-                  : t("watchInfo.autoMeasure.off")
-              }
-              tone={item.on ? "success" : "muted"}
-            />
-          ))
+          info.autoMeasure
+            .filter((item) => item.type !== "HRV")
+            .map((item) => (
+              <Row
+                key={item.type}
+                label={AUTO_TYPE_LABEL[item.type] ? t(AUTO_TYPE_LABEL[item.type]) : item.type}
+                value={
+                  item.on
+                    ? `${t("watchInfo.autoMeasure.every", { min: item.intervalMin })} · ${hhmm(item.startMin)}–${hhmm(item.endMin)}`
+                    : t("watchInfo.autoMeasure.off")
+                }
+                tone={item.on ? "success" : "muted"}
+              />
+            ))
         )}
       </CusCard>
 

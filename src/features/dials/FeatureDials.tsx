@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { ActivityIndicator, Pressable, useWindowDimensions, View } from "react-native";
 
 import { CusAccordion, CusButton, CusCard, CusImage, CusPageHeader, CusScrollView, CusText } from "@/components/ui";
+import type { TranslationKey } from "@/shared/i18n/translations";
+import { useT } from "@/shared/i18n/use-t";
 import { reconnectWatch, useWatchConnection } from "@/shared/watch/watch-connection";
 import { useTabBarSpace } from "@/widgets/app-tabs/AppTabs";
 
@@ -15,21 +17,22 @@ const PADDING = 16;
 const MAX_WIDTH = 600; // planshetda kataklar haddan tashqari kattalashmasin
 const PREVIEW_RATIO = 0.82; // soat ekrani (to'rtburchak) nisbati
 
-const FAILURE_TEXT: Record<MarketFailure, string> = {
-  notReady: "Soat ulanmagan. Ulangach siferblatlar shu yerda chiqadi.",
-  busy: "Soat hozir band (o'lchov ketyapti). Tugagach qayta urinib ko'ring.",
-  outdated: "Siferblatlar uchun ilovani yangilang.",
-  noDevice: "Soat haqidagi ma'lumot to'liq emas. Soatni qayta ulang.",
-  unsupported: "Bu soat siferblat do'konini qo'llab-quvvatlamaydi.",
-  noInfo: "Soat siferblat ma'lumotini bermadi. Qayta urinib ko'ring.",
-  network: "Serverdan ro'yxatni olib bo'lmadi. Internetni tekshiring.",
-  noReply: "Javob kelmadi. Qayta urinib ko'ring.",
+const FAILURE_TEXT: Record<MarketFailure, TranslationKey> = {
+  notReady: "dials.fail.notReady",
+  busy: "dials.fail.busy",
+  outdated: "dials.fail.outdated",
+  noDevice: "dials.fail.noDevice",
+  unsupported: "dials.fail.unsupported",
+  noInfo: "dials.fail.noInfo",
+  network: "dials.fail.network",
+  noReply: "dials.fail.noReply",
 };
 
-// Soat siferblati do'koni: Veepoo serveridagi siferblatlar 3 ustunli to'rda, har birining ostida "O'rnatilgan" yoki
+// Soat ekrani (siferblat) do'koni: Veepoo serveridagi siferblatlar 3 ustunli to'rda, har birining ostida "O'rnatilgan" yoki
 // "O'rnatish". O'rnatish — markazdagi oynada (yuklab olish va soatga uzatish, ~2 daqiqa).
 export function FeatureDials() {
-  const { load, reload, installedCrc, setInstalledCrc, connected } = useDialMarket();
+  const t = useT();
+  const { load, reload, installedCrc, markInstalled, history, connected } = useDialMarket();
   const { battery } = useWatchConnection();
   const { width } = useWindowDimensions();
   const tabBarSpace = useTabBarSpace();
@@ -43,50 +46,64 @@ export function FeatureDials() {
   const { firmware, testFirmware } = useWatchConnection().info;
   const currentCrc = result?.ok ? result.currentCrc : null;
   const installed = (d: MarketDial) => (installedCrc !== null ? d.crc === installedCrc : isCurrentDial(d, currentCrc));
+  // Tepada: soatdagi hozirgisi, keyin ilova orqali oldin o'rnatilganlar (tarix tartibida), pastda qolganlari.
+  const current = dials.filter(installed);
+  const byUrl = new Map(dials.map((d) => [d.fileUrl, d]));
+  const previous = history
+    .map((h) => byUrl.get(h.fileUrl))
+    .filter((d): d is MarketDial => d !== undefined && !installed(d));
+  const pinned = new Set([...current, ...previous].map((d) => d.fileUrl));
+  const others = dials.filter((d) => !pinned.has(d.fileUrl));
+  const cell = (d: MarketDial, again = false) => (
+    <DialCell key={d.fileUrl} dial={d} width={itemWidth} installed={installed(d)} again={again} onInstall={() => setTarget(d)} />
+  );
 
   return (
     <View className="flex-1 bg-background">
-      <CusPageHeader title="Soatga siferblat qo'yish" fallbackHref="/watch" />
+      <CusPageHeader title={t("dials.header")} fallbackHref="/watch" />
 
       <CusScrollView contentContainerClassName="gap-4 p-4" contentContainerStyle={{ paddingBottom: tabBarSpace }}>
         {!connected ? (
           <CusCard>
-            <CusText tone="muted">{FAILURE_TEXT.notReady}</CusText>
+            <CusText tone="muted">{t(FAILURE_TEXT.notReady)}</CusText>
           </CusCard>
         ) : load.status === "loading" ? (
           <CusCard className="items-center gap-2 py-8">
             <ActivityIndicator />
-            <CusText tone="muted">Siferblatlar yuklanmoqda…</CusText>
+            <CusText tone="muted">{t("dials.loading")}</CusText>
           </CusCard>
         ) : result && !result.ok ? (
           <CusCard className="gap-3">
-            <CusText>{FAILURE_TEXT[result.reason]}</CusText>
+            <CusText>{t(FAILURE_TEXT[result.reason])}</CusText>
             {result.message ? (
               <CusText variant="caption" tone="muted">
                 {result.message}
               </CusText>
             ) : null}
             {result.reason === "noDevice" ? (
-              <CusButton title="Qayta ulash" variant="outline" size="sm" onPress={reconnectWatch} />
+              <CusButton title={t("dials.reconnect")} variant="outline" size="sm" onPress={reconnectWatch} />
             ) : result.reason !== "unsupported" && result.reason !== "outdated" ? (
-              <CusButton title="Qayta urinish" variant="outline" size="sm" onPress={() => void reload()} />
+              <CusButton title={t("dials.retry")} variant="outline" size="sm" onPress={() => void reload()} />
             ) : null}
           </CusCard>
         ) : result && result.ok && dials.length === 0 ? (
           <CusCard className="gap-3">
-            <CusText>Server bu soat uchun siferblat bermadi.</CusText>
+            <CusText>{t("dials.empty.title")}</CusText>
             <CusText variant="caption" tone="muted">
-              Sabab: ilovamiz Veepoo serverida hali ro&apos;yxatdan o&apos;tmagan bo&apos;lishi mumkin (server ro&apos;yxatni ilova
-              nomiga qarab beradi).
+              {t("dials.empty.reason")}
             </CusText>
-            <CusButton title="Qayta urinish" variant="outline" size="sm" onPress={() => void reload()} />
+            <CusButton title={t("dials.retry")} variant="outline" size="sm" onPress={() => void reload()} />
           </CusCard>
         ) : result && result.ok ? (
-          <View className="flex-row flex-wrap" style={{ gap: GAP }}>
-            {dials.map((d) => (
-              <DialCell key={d.fileUrl} dial={d} width={itemWidth} installed={installed(d)} onInstall={() => setTarget(d)} />
-            ))}
-          </View>
+          <>
+            {current.length > 0 ? <DialSection title={t("dials.section.current")}>{current.map((d) => cell(d))}</DialSection> : null}
+            {previous.length > 0 ? (
+              <DialSection title={t("dials.section.previous")}>{previous.map((d) => cell(d, true))}</DialSection>
+            ) : null}
+            {others.length > 0 ? (
+              <DialSection title={pinned.size > 0 ? t("dials.section.others") : null}>{others.map((d) => cell(d))}</DialSection>
+            ) : null}
+          </>
         ) : null}
 
         {load.status === "done" ? (
@@ -106,9 +123,24 @@ export function FeatureDials() {
         dial={target}
         battery={battery}
         onClose={() => setTarget(null)}
-        onInstalled={(d) => setInstalledCrc(d.crc)}
+        onInstalled={markInstalled}
         onIncompatible={(d) => setRejected((s) => new Set(s).add(d.fileUrl))}
       />
+    </View>
+  );
+}
+
+function DialSection({ title, children }: { title: string | null; children: ReactNode }) {
+  return (
+    <View className="gap-2">
+      {title ? (
+        <CusText variant="caption" tone="muted" className="font-semibold uppercase">
+          {title}
+        </CusText>
+      ) : null}
+      <View className="flex-row flex-wrap" style={{ gap: GAP }}>
+        {children}
+      </View>
     </View>
   );
 }
@@ -117,36 +149,41 @@ function DialCell({
   dial,
   width,
   installed,
+  again,
   onInstall,
 }: {
   dial: MarketDial;
   width: number;
   installed: boolean;
+  /** Oldin o'rnatilgan, hozir soatda emas: tugma "Qayta o'rnatish". */
+  again: boolean;
   onInstall: () => void;
 }) {
+  const t = useT();
+  const name = dial.name || t("dials.unnamed");
   return (
     <View className="items-center gap-2" style={{ width }}>
       <CusImage
         source={{ uri: dial.previewUrl }}
-        accessibilityLabel={dial.name || "Siferblat"}
+        accessibilityLabel={name}
         style={{ width, aspectRatio: PREVIEW_RATIO, borderRadius: 14 }}
       />
       {installed ? (
         <View className="rounded-full bg-primary px-3 py-1">
           <CusText variant="caption" className="font-semibold text-white">
-            O&apos;rnatilgan
+            {t("dials.installed")}
           </CusText>
         </View>
       ) : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${dial.name || "Siferblat"}ni o'rnatish`}
+          accessibilityLabel={t("dials.installA11y", { name })}
           onPress={onInstall}
           hitSlop={6}
           className="rounded-full border border-border bg-surface px-3 py-1 active:bg-surface-alt"
         >
           <CusText variant="caption" className="font-semibold">
-            O&apos;rnatish
+            {t(again ? "dials.reinstall" : "dials.install")}
           </CusText>
         </Pressable>
       )}

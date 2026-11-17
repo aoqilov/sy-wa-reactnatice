@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 
-// Soat bo'limi (header'dagi soat tugmasi): "Soat ma'lumotlari" va uning ichidagi "Soatga siferblat qo'yish".
+// Soat bo'limi (header'dagi soat tugmasi): "Soat ma'lumotlari" va uning ichidagi "Soat ekrani".
 export default function WatchLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>

@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Modal, View } from "react-native";
 
 import { CusButton, CusImage, CusText } from "@/components/ui";
+import type { TranslationKey } from "@/shared/i18n/translations";
+import { useT } from "@/shared/i18n/use-t";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 
 import { type InstallStage, installDial, type MarketDial } from "../api/dials";
@@ -10,25 +12,25 @@ import { type InstallStage, installDial, type MarketDial } from "../api/dials";
 /** Hujjat: past batareyada uzatish boshlansa, soat o'chib qolishi mumkin. */
 const MIN_BATTERY = 30;
 
-const STAGE_TEXT: Record<InstallStage, string> = {
-  download: "Yuklab olinmoqda",
-  prepare: "Soat tayyorlanmoqda",
-  clear: "Soat xotirasi tozalanmoqda",
-  transfer: "Soatga yozilmoqda",
+const STAGE_TEXT: Record<InstallStage, TranslationKey> = {
+  download: "dials.stage.download",
+  prepare: "dials.stage.prepare",
+  clear: "dials.stage.clear",
+  transfer: "dials.stage.transfer",
 };
 
-const ERROR_TEXT: Record<string, string> = {
-  NOT_READY: "Soat ulanmagan.",
-  OUTDATED: "Siferblatlar uchun ilovani yangilang.",
-  BUSY: "Soat hozir band (o'lchov ketyapti). Tugagach qayta urinib ko'ring.",
-  LOST: "Soat bilan aloqa uzildi. Soatni telefonga yaqin tutib, qayta urinib ko'ring.",
-  NO_REPLY: "Soat javob bermadi. Qayta urinib ko'ring.",
-  DOWNLOAD: "Siferblat faylini yuklab bo'lmadi. Internetni tekshiring.",
-  LOW_BATTERY: "Soat batareyasi past. Zaryadlab, qayta urinib ko'ring.",
-  JL_PREPARE: "Soatni uzatishga tayyorlab bo'lmadi. Qayta urinib ko'ring.",
-  INTO_UPDATE_MODE_FAIL: "Soat uzatish rejimiga o'tmadi. Qayta urinib ko'ring.",
-  CHECK_CRC_FAIL: "Fayl soatga buzilib yetib bordi. Qayta urinib ko'ring.",
-  VERSION_MISMATCH: "Bu siferblat soatingiz dasturiga mos emas. Boshqa siferblatni tanlang.",
+const ERROR_TEXT: Record<string, TranslationKey> = {
+  NOT_READY: "dials.err.NOT_READY",
+  OUTDATED: "dials.fail.outdated",
+  BUSY: "dials.fail.busy",
+  LOST: "dials.err.LOST",
+  NO_REPLY: "dials.fail.noReply",
+  DOWNLOAD: "dials.err.DOWNLOAD",
+  LOW_BATTERY: "dials.err.LOW_BATTERY",
+  JL_PREPARE: "dials.err.JL_PREPARE",
+  INTO_UPDATE_MODE_FAIL: "dials.err.INTO_UPDATE_MODE_FAIL",
+  CHECK_CRC_FAIL: "dials.err.CHECK_CRC_FAIL",
+  VERSION_MISMATCH: "dials.err.VERSION_MISMATCH",
 };
 
 /** Bu xatolarda texnik tafsilot (kod) ko'rsatilmaydi: matnning o'zi yetarli. */
@@ -52,6 +54,7 @@ type Props = {
 // O'rnatish oynasi (markazda): preview, "~2 daqiqa" ogohlantirishi, bosqich va foiz chizig'i. Uzatish paytida yopilmaydi.
 // Ota komponent har yangi siferblat uchun `key` ni o'zgartiradi: holat har safar boshidan.
 export function InstallModal({ dial, battery, onClose, onInstalled, onIncompatible }: Props) {
+  const t = useT();
   const [phase, setPhase] = useState<Phase>({ name: "confirm" });
   const success = useThemeColor("success", "#17A34A");
   const danger = useThemeColor("danger", "#E0342F");
@@ -67,7 +70,7 @@ export function InstallModal({ dial, battery, onClose, onInstalled, onIncompatib
       setPhase({ name: "done" });
       onInstalled(dial);
     } else {
-      const base = ERROR_TEXT[result.error] ?? "Siferblatni o'rnatib bo'lmadi. Qayta urinib ko'ring.";
+      const base = t(ERROR_TEXT[result.error] ?? "dials.err.generic");
       const detail = result.message && !PLAIN_ERRORS.has(result.error);
       setPhase({ name: "error", text: detail ? `${base}\n(${result.error}: ${result.message})` : base });
       if (result.error === "VERSION_MISMATCH") onIncompatible(dial);
@@ -84,7 +87,7 @@ export function InstallModal({ dial, battery, onClose, onInstalled, onIncompatib
             <View className="items-center gap-2">
               <Octicons name="check-circle-fill" size={28} color={success} />
               <CusText variant="heading" className="text-center">
-                Siferblat o&apos;rnatildi
+                {t("dials.done")}
               </CusText>
             </View>
           ) : phase.name === "error" ? (
@@ -94,7 +97,7 @@ export function InstallModal({ dial, battery, onClose, onInstalled, onIncompatib
             </View>
           ) : (
             <CusText tone="muted" className="text-center">
-              Siferblatni soatga uzatish taxminan 2 daqiqa davom etadi. Telefonni soatga yaqin tuting va ilovani yopmang.
+              {t("dials.warn")}
             </CusText>
           )}
 
@@ -104,7 +107,7 @@ export function InstallModal({ dial, battery, onClose, onInstalled, onIncompatib
                 <View className="h-full rounded-full bg-primary" style={{ width: `${phase.percent}%` }} />
               </View>
               <CusText variant="caption" tone="muted" className="text-center">
-                {STAGE_TEXT[phase.stage]}… {phase.percent}%
+                {t(STAGE_TEXT[phase.stage])}… {phase.percent}%
               </CusText>
             </View>
           ) : null}
@@ -113,16 +116,16 @@ export function InstallModal({ dial, battery, onClose, onInstalled, onIncompatib
             <View className="w-full gap-2">
               {lowBattery ? (
                 <CusText variant="caption" tone="danger" className="text-center">
-                  Soat batareyasi {battery}%. O&apos;rnatish uchun kamida {MIN_BATTERY}% kerak.
+                  {t("dials.lowBattery", { v: battery ?? 0, min: MIN_BATTERY })}
                 </CusText>
               ) : null}
-              <CusButton title="O'rnatish" disabled={lowBattery} onPress={() => void start()} />
-              <CusButton title="Bekor qilish" variant="ghost" size="sm" onPress={onClose} />
+              <CusButton title={t("dials.install")} disabled={lowBattery} onPress={() => void start()} />
+              <CusButton title={t("dials.cancel")} variant="ghost" size="sm" onPress={onClose} />
             </View>
           ) : null}
 
           {phase.name === "done" || phase.name === "error" ? (
-            <CusButton title="Yopish" className="w-full" onPress={onClose} />
+            <CusButton title={t("dials.close")} className="w-full" onPress={onClose} />
           ) : null}
         </View>
       </View>

@@ -68,7 +68,10 @@ export type GlucoseRisk = "LOW" | "MIDDLE" | "HIGH";
 /** Qon tahlili: siydik kislotasi µmol/l; umumiy xolesterin, triglitseridlar, HDL, LDL — mmol/l. */
 export type BloodParts = { uricAcid: number; tcho: number; tag: number; hdl: number; ldl: number };
 
-/** Tana tarkibi: BMI; yog', mushak, suv — %; mushak, suyak — kg; asosiy almashinuv (BMR) — kkal. */
+/**
+ * Tana tarkibi (soatning 14 ta qiymati). % — tana vazniga nisbatan ulush, kg — massa, bmr — kkal/kun. Eski build'lar
+ * faqat birinchi yettitasini beradi, shuning uchun qolganlari ixtiyoriy.
+ */
 export type BodyParts = {
   bmi: number;
   fatPct: number;
@@ -77,6 +80,18 @@ export type BodyParts = {
   waterPct?: number;
   boneKg?: number;
   bmr?: number;
+  /** Yog' massasi. */
+  fatKg?: number;
+  /** Yog'siz tana massasi (FFM). */
+  ffmKg?: number;
+  /** Teri osti yog'i. */
+  subFatPct?: number;
+  /** Suv massasi. */
+  waterKg?: number;
+  /** Skelet mushaklari ulushi. */
+  skeletalPct?: number;
+  proteinPct?: number;
+  proteinKg?: number;
 };
 
 /** Tarjima kaliti: `measure.error.<kod>` */
@@ -223,11 +238,28 @@ function detectError(state: unknown): MeasureError {
   }
 }
 
+/** Qiymat oqilona oraliqda bo'lmasa tashlanadi (birlik noto'g'ri taxmin qilingan yoki soat 0 yuborgan). */
+const BODY_RANGES: Record<Exclude<keyof BodyParts, "bmi" | "fatPct">, [number, number]> = {
+  musclePct: [10, 95],
+  muscleKg: [5, 150],
+  waterPct: [20, 80],
+  boneKg: [0.5, 10],
+  bmr: [500, 4000],
+  fatKg: [1, 200],
+  ffmKg: [10, 200],
+  subFatPct: [1, 60],
+  waterKg: [5, 150],
+  skeletalPct: [5, 70],
+  proteinPct: [5, 30],
+  proteinKg: [1, 50],
+};
+
 /**
- * Tana tarkibi natijasi. SDK hujjatida qiymatlar ba'zan "10 barobar" deyilgan: yog' ulushi oqilona chegaradan (2..60 %)
- * katta bo'lsa, hammasi 10 ga bo'linadi. Asosiy ikkitasi (BMI, yog' %) bo'lmasa natija yaroqsiz.
+ * Tana tarkibi natijasi (o'lchov "bodyDone" va soat tarixi "bodyHistory" yozuvlari uchun). SDK hujjatida qiymatlar
+ * ba'zan "10 barobar" deyilgan: yog' ulushi oqilona chegaradan (2..60 %) katta bo'lsa, hammasi 10 ga bo'linadi.
+ * Asosiy ikkitasi (BMI, yog' %) bo'lmasa natija yaroqsiz.
  */
-function bodyParts(e: WatchEvent): BodyParts | undefined {
+export function parseBodyParts(e: Record<string, unknown>): BodyParts | undefined {
   const raw = (k: string) => {
     const v = e[k];
     return typeof v === "number" && Number.isFinite(v) ? v : undefined;
@@ -240,15 +272,12 @@ function bodyParts(e: WatchEvent): BodyParts | undefined {
   const bmi = inRange(get("bmi"), 5, 80);
   const fatPct = inRange(get("fatPct"), 2, 60);
   if (bmi === undefined || fatPct === undefined) return undefined;
-  return {
-    bmi,
-    fatPct,
-    musclePct: get("musclePct"),
-    muscleKg: get("muscleKg"),
-    waterPct: get("waterPct"),
-    boneKg: get("boneKg"),
-    bmr: get("bmr"),
-  };
+  const parts: BodyParts = { bmi, fatPct };
+  for (const [k, [lo, hi]] of Object.entries(BODY_RANGES) as [keyof typeof BODY_RANGES, [number, number]][]) {
+    const v = inRange(get(k), lo, hi);
+    if (v !== undefined) parts[k] = v;
+  }
+  return parts;
 }
 
 /** Musbat son bo'lsa o'zi, aks holda undefined (soat yo'q qiymatni 0 deb yuboradi). */
@@ -813,7 +842,7 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
         if (e.type === "bodyError") return fail(detectError(e.state));
         if (e.type === "bodyStop") return fail("noData"); // natijasiz to'xtadi
         if (e.type === "bodyDone") {
-          const parts = bodyParts(e);
+          const parts = parseBodyParts(e);
           if (!parts) return fail("noData");
           finishedBySelf = true;
           return done({ key, body: parts });

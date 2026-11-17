@@ -1,6 +1,6 @@
 # Faollik: qadam, kaloriya, masofa
 
-Holat (2026-11-12): 1-bosqich yozildi, **soatda sinalmagan**.
+Holat (2026-11-16): 1-bosqich soatda sinaldi, qadam, kkal va masofa to'g'ri ishlaydi.
 
 ## 1-bosqich (qilingan)
 
@@ -17,8 +17,13 @@ Holat (2026-11-12): 1-bosqich yozildi, **soatda sinalmagan**.
 
 ## Keyingi bosqichlar
 
-2. Soatma-soat grafik va kunlar tarixi: `readOriginData` (tarix sinxroni allaqachon o'qiydi) — `OriginData.stepValue /
-   calValue / disValue` (5 daqiqalik) maydonlarini olish kifoya.
-3. Uyqu: `readSleepData` → `SleepData` (chuqur/yengil, uyg'onishlar, sifat, `sleepLine`).
+2. Kunlik qadamlar tarixi: yozildi (2026-11-16), soatda sinalmagan. Native kunlik o'qish (`readDaily`) har 5 daqiqalik
+   yozuvga `step` / `cal` / `dis` qo'shadi. History sinxroni ularni `src/shared/watch/step-history.ts` ga beradi:
+   oxirgi 5 kun 5 daqiqalik (`steps.fine.v1`, vaqt kaliti bilan, shuning uchun takror o'qish zarar qilmaydi), har kun
+   jami va 48 ta 30 daqiqalik bo'lak (`steps.days.v1`, 90 kun). Bugungi jami: `readSportStep` va yig'indidan kattasi.
+   UI: `/history/steps` (kun, soatma-soat, 7/30 kun, o'rtachalar), History kartasi, qadam halqasida "Batafsil".
+   Tekshirish: jurnaldagi `[steps] N ta 5 daqiqalik yozuv`; o'tgan kunning yig'indisi soatdagi kunlik jamiga mos
+   kelishi, `cal` kkal va `dis` km ekani (dis > 10 bo'lsa metr deb olinadi).
+3. Uyqu: yozildi, [sleep.md](sleep.md).
 4. Uzoq o'tirish eslatmasi: `settingLongSeat` (Rejam bo'limi).
 5. Mashg'ulot rejimlari: `startMultSportModel(ESportType)` — S105 qo'llashini tekshirish kerak.

@@ -12,8 +12,13 @@ export default function HistoryLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="sleep" />
+      <Stack.Screen name="steps" />
+      <Stack.Screen name="body" />
+      <Stack.Screen name="body/[id]" />
       <Stack.Screen name="[metric]" />
       <Stack.Screen name="ecg/[id]" />
+      <Stack.Screen name="blood/[id]" />
     </Stack>
   );
 }

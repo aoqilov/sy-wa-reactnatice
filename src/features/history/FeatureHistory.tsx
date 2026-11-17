@@ -5,6 +5,9 @@ import { ActivityIndicator, Pressable, RefreshControl, View } from "react-native
 
 import { CusScrollView, CusText } from "@/components/ui";
 import type { MetricKey } from "@/features/home/api/get-metrics";
+import { activityAvailable, StepsHistoryCard } from "@/features/activity";
+import { BodyHistoryCard, refreshBodyFromWatch } from "@/features/body";
+import { SleepHistoryCard, useSleep } from "@/features/sleep";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 import type { SyncFailure } from "@/shared/watch/watch-history";
 import { useTabBarSpace } from "@/widgets/app-tabs/AppTabs";
@@ -24,6 +27,7 @@ export function FeatureHistory({ focusKey }: { focusKey?: MetricKey }) {
   const { summaries, loading, sync, refresh, connected } = useHistory(period);
   const tabBarSpace = useTabBarSpace();
   const primary = useThemeColor("primary", "#1E6FEB");
+  const sleep = useSleep();
 
   const ordered = focusKey
     ? [...summaries].sort((a, b) => Number(b.meta.key === focusKey) - Number(a.meta.key === focusKey))
@@ -50,7 +54,11 @@ export function FeatureHistory({ focusKey }: { focusKey?: MetricKey }) {
             <RefreshControl
               refreshing={sync.syncing}
               onRefresh={() => {
-                if (connected) void refresh();
+                if (!connected) return;
+                // Tarix va uyqu ketma-ket o'qiladi (soat navbati): uyqu band bo'lsa o'zi qayta urinadi.
+                void refresh()
+                  .then(() => sleep.refresh())
+                  .then(() => refreshBodyFromWatch());
               }}
               enabled={connected}
               colors={[primary]}
@@ -58,6 +66,10 @@ export function FeatureHistory({ focusKey }: { focusKey?: MetricKey }) {
             />
           }
         >
+          {/* Qadamlar va uyqu: davr tablaridan qat'i nazar oxirgi 7 kun; to'liq tarixi o'z sahifasida */}
+          {activityAvailable() ? <StepsHistoryCard onPress={() => router.push("/history/steps")} /> : null}
+          {sleep.available ? <SleepHistoryCard onPress={() => router.push("/history/sleep")} /> : null}
+          <BodyHistoryCard onPress={() => router.push("/history/body")} />
           {ordered.map((s) => (
             <HistoryCard
               key={s.meta.key}
