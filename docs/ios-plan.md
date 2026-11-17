@@ -2,86 +2,94 @@ iOS rejasi
 
 Maqsad: iOS ham Android kabi ishlasin. iOS native qismi JS'ga Android bilan bir xil funksiya nomlarini va bir xil
 hodisalarni beradi. Shunda Home, Tarix, uyqu, qadamlar va tana tarkibi kodi o'zgarmasdan ikkala platformada ishlaydi.
-Android tomonda 65 ta native funksiya bor (VeepooWatchModule.kt). iOS papkasi (modules/veepoo-watch/ios) hali yo'q.
-Umumiy qarorlar: docs/watch-integration-plan.md, 6- va 7-bosqichlar.
+Ikkala modulda 61 ta native funksiya bor (VeepooWatchModule.kt va VeepooWatchModule.swift, ro'yxati bir xil).
+Umumiy qarorlar: docs/watch-integration-plan.md, 6- va 7-bosqichlar. Moslik jadvali: docs/ios-mapping.md.
+
+Holat (2026-11-17): 0-7 bosqichlar yozildi, HECH BIRI SINALMAGAN va kompilyatsiya qilinmagan (Mac va iPhone yo'q).
+Foydalanuvchi qarori: hamma bosqich sinovsiz yoziladi, xatolar birinchi ishga tushirishda ilova ichidagi konsol
+orqali topilib, joyida tuzatiladi (8-bosqich).
 
 
-0. Tayyorgarlik — bajarildi (2026-11-17)
+0. Tayyorgarlik — bajarildi
 
 SDK 2.2.113.15 o'rganildi, moslik jadvali: docs/ios-mapping.md. Asosiy topilmalar:
 - Freymvorklarda simulyator qismi yo'q, faqat iPhone (arm64). Kompilyatsiyani simulyator build'i bilan tekshirib
-  bo'lmaydi. Tavsiya: GitHub Actions macOS runner'da imzosiz xcodebuild (EAS limiti va Apple akkaunti kerak emas).
+  bo'lmaydi. Variant: GitHub Actions macOS runner'da imzosiz xcodebuild (.github/workflows/ios-compile.yml).
 - SDK "o'zi saqlaydi" rejimida (VPPeripheralManage) ishlatiladi: kunlik ma'lumot, uyqu, soatdagi tana tarkibi
   faqat SDK bazasi orqali o'qiladi.
-- Yana 5 ta freymvork va 2 ta pod kerak (JL_BLEKit, DFUnits, JLDialUnit, ZipZap, GRDFUSDK; FMDB, MJExtension).
-- Nasosli bosimni ilovadan boshlash uchun iOS SDK'da API yo'q. Yechim yozildi: Android SDK yuboradigan kadr
-  CoreBluetooth orqali to'g'ridan-to'g'ri yoziladi, javob SDK delegate'idan o'qiladi
-  (modules/veepoo-watch/ios/CuffBpChannel.swift). Zaxira: Health Glance (Android'da startMiniCheckup).
+- 7 ta freymvork va 2 ta pod kerak (VeepooBleSDK, JL_BLEKit, DFUnits, JLDialUnit, ZipZap, GRDFUSDK, ABParTool;
+  FMDB, MJExtension). Har biri SDK binaridagi tashqi sinflardan aniqlangan (podspec izohi).
+- Nasosli bosimni ilovadan boshlash uchun iOS SDK'da API yo'q. Yechim: Android SDK yuboradigan kadr CoreBluetooth
+  orqali to'g'ridan-to'g'ri yoziladi, javob SDK delegate'idan o'qiladi (CuffBpChannel.swift). Zaxira: Health Glance.
 
 
-1. Modul skeleti — yozildi (2026-11-17), kompilyatsiya hali tekshirilmagan
+1. Modul skeleti — yozildi
 
-Fayllar: modules/veepoo-watch/ios/ (VeepooWatchModule.swift, WatchController.swift, CuffBpChannel.swift,
-VeepooWatch.podspec, Frameworks/ — 7 ta freymvork, 33 MB), expo-module.config.json ga "apple",
-app.json ga Bluetooth ruxsati va fon rejimi, .github/workflows/ios-compile.yml.
-Skeletdagi funksiyalar: isBluetoothEnabled, requestEnableBluetooth, getConnectionState, startCuffBp, stopCuffBp.
-Expo autolinking iOS modulini topadi (Windows'da tekshirildi).
-
-ios/ papkasi: VeepooWatchModule.swift (JS bilan bog'lovchi), WatchController.swift (WatchController.kt ning
-muqobili), freymvorklar ulangan .podspec (FMDB va MJExtension bog'liqliklari bilan).
-Kompilyatsiya tekshiruvi: GitHub Actions workflow (expo prebuild, pod install, xcodebuild -sdk iphoneos
-CODE_SIGNING_ALLOWED=NO).
-expo-module.config.json ga iOS qo'shiladi.
-app.json ga Bluetooth ruxsati matni (NSBluetoothAlwaysUsageDescription).
-Buyruqlar navbati: SDK buyruqlarni parallel bajarmaydi.
-Hodisalar (event, connection, scan) Android bilan bir xil nom va shaklda.
+modules/veepoo-watch/ios/: VeepooWatchModule.swift (JS ko'prigi), WatchController.swift (SDK chaqiruvlari),
+CuffBpChannel.swift, VeepooWatch.podspec, Frameworks/ (33 MB). expo-module.config.json ga "apple", app.json ga
+Bluetooth ruxsati va fon rejimi. Expo autolinking iOS modulini topadi (Windows'da tekshirildi).
 
 
-2. Ulanish
+2. Ulanish — yozildi
 
-Skan, ulanish (iOS'da qurilma MAC emas, UUID bilan aniqlanadi), parol, batareya, soat imkoniyatlari.
-Natija: "soatni ulang" ekrani va avto-ulanish iOS'da ham ishlaydi.
-
-
-3. O'lchovlar
-
-Puls, EKG, harorat, shakar, qon tahlili, HRV, stress, MET, tana tarkibi.
-Bosim: iOS SDK'da yostiqchali bosimni ilovadan boshlash API'si yo'q. Uning o'rniga "soatning o'zida o'lchash"
-oqimi ishlatiladi.
+Skan (id = CBPeripheral UUID), ulanish (parol SDK ichida avtomatik), saqlangan soatga avto-ulanish (avval skanda
+qidiriladi, 15 s), uzilish va Bluetooth o'chishi, batareya. Ulanishdan keyin "pwd" va "features" hodisalari
+peripheralModel'dan yasaladi. Konsolga "[device] ..." qatori: soatning barcha imkoniyat bayroqlari.
 
 
-4. Ma'lumot sinxroni
+3. O'lchovlar — yozildi
 
-Qo'lda o'lchovlar tarixi, 5 daqiqalik kunlik yozuvlar, qadamlar, uyqu, soatdagi tana tarkibi natijalari.
-Shaxsiy ma'lumot va avto-o'lchash sozlamasi ("Mening rejam").
-
-
-5. Bildirishnomalar va sozlamalar
-
-Soatga bildirishnoma ilovadan yuborilmaydi. Uning o'rniga OS jadvallagan lokal bildirishnoma ishlatiladi, iPhone
-uni ANCS orqali soatga o'zi uzatadi. Bu ilova yopiq bo'lganda ham ishlaydi.
-Budilniklar va soatdagi kalitlar.
-Qo'ng'iroq ko'prigi (CallBridge) iOS'da bo'lmaydi: iOS ilovaga qo'ng'iroqlarni ko'rish imkonini bermaydi, iPhone
-qo'ng'iroqni soatga o'zi ko'rsatadi.
+Puls, SpO2, harorat (qiymat 10 ga bo'linadi), EKG (iOS butun modelni beradi: soniyalik holat, mV to'lqin
+convertToMv bilan, oxirgi natija Android shakliga yasaladi), shakar (100 ga bo'linadi), qon tahlili, HRV, stress,
+MET, tana tarkibi, nasosli bosim (CuffBpChannel), soatda o'lchangan bosim.
+iOS'da xato holati o'lchovni darhol tugatadi: native `final: true` qo'shadi, measure.ts uni darhol xato qiladi.
 
 
-6. Soat ekrani (siferblat)
+4. Ma'lumot sinxroni — yozildi
 
-0-bosqichdagi jadvalga bog'liq. Jieli soatlar uchun iOS'da alohida JL freymvorki kerak bo'lishi mumkin. Mos API
-bo'lmasa, iOS'da bu bo'lim yashiriladi.
-
-
-7. JS moslashuvi
-
-Ilova funksiya bor-yo'qligiga qarab ishlaydi (dialsAvailable, bodyWatchHistoryAvailable va h.k.), shuning uchun
-iOS'da yo'q funksiyalar o'zi yashiriladi.
-Qolgani: Platform.OS === "ios" tekshiruvlari (bosim oqimi, bildirishnomalar, qo'ng'iroq bo'limi) va iOS uchun matnlar.
+Qo'lda o'lchovlar (readManualTestData, qiymatlar xom: watch-history.ts o'zi o'giradi). Kunlik ma'lumot: avval
+veepooSdkStartReadDeviceAllData (SDK bazasiga), keyin bazadan kun bo'yicha: puls/bosim/qadam, SpO2, shakar,
+harorat, qon tahlili. Kunning bir qismini o'qib bo'lmaydi: readDailyDay kunni to'liq beradi. Qadamlar, uyqu
+(aniq uyquda parseSleepLine), soatdagi tana tarkibi.
 
 
-8. Telefonda sinash
+5. Sozlamalar va eslatmalar — yozildi
 
-Kompilyatsiya xatolarini tuzatish.
-Har bir bosqichni iPhone'da E500 soat bilan sinash.
+Shaxsiy ma'lumot, avto-o'lchash (VPAutoMonitTestModel), avto-o'lchash kalitlari va kechasi SpO2
+(veepooSDKSettingBaseFunctionType; SpO2 uchun vaqt oralig'i yo'q), salomatlik eslatmalari, harakatsizlik, puls
+ogohlantirishi, matnli budilnik (repeat: Android satri <-> 8 bitli son), bildirishnoma kalitlari.
+Bildirishnoma matnini ilova yubora olmaydi (iPhone ANCS orqali o'zi uzatadi); soat matn uzatishni qo'llasa
+(textAndImageTransmissionType == 1) shu ishlatiladi. Qo'ng'iroq ko'prigi iOS'da yo'q: call-forward.ts bo'limni
+yashiradi. Lokal bildirishnoma hozircha kerak emas: ilovada bildirishnoma yuboradigan oqim yo'q (rejadagi
+eslatmalar soatning matnli budilnigi orqali ishlaydi).
+
+
+6. Siferblat — yozildi
+
+dialChannel(o'qish, do'kon) -> VPMarketDialManager: serverdan ro'yxat, yuklab olish, soatga uzatish.
+Jieli soatda JL freymvorklari ishlatiladi (ular podspec'da bor). Hodisalar Android bilan bir xil.
+
+
+7. JS moslashuvi — yozildi
+
+watch-connection.ts (iOS ham "supported"), bluetooth-permissions.ts (iOS'da ruxsatni tizim o'zi so'raydi),
+WatchDevPanel (iOS'da ham ochiladi), measure.ts (`final` va `notWorn` belgilar). Android xatti-harakati o'zgarmagan.
+
+Ilova ichidagi konsol (src/widgets/debug-console, src/shared/debug/debug-log.ts): iOS'da va dev build'da chap pastda
+">_" tugmasi, qizil son — yangi xatolar. Yig'iladi: native "error"/"writeError"/"log", `unsupported`/`failed`
+javoblar, ulanish va skan holatlari, JS xatolari (ErrorUtils, console.error/warn), o'lchov xatolari, soat jurnali.
+"Ulashish" tugmasi butun jurnalni matn qilib yuboradi (Telegram va h.k.): shu matn bilan xatoni tuzatamiz.
+
+
+8. Telefonda sinash — kutilmoqda
+
+Kerak: Apple Developer akkaunti, iPhone, iOS build (EAS, foydalanuvchi ruxsati bilan).
+1. Build. Kompilyatsiya xatolari bo'lsa, EAS jurnalidan tuzatiladi. (Ixtiyoriy: avval GitHub Actions bilan bepul
+   tekshirish.)
+2. Ilovani ochish: konsolda "Konsol yoqildi" va native funksiyalar yo'qligi haqida xato bo'lmasligi kerak.
+3. Ulanish: "[device] ..." qatori (bayroqlar), keyin har bo'lim: o'lchovlar, Tarix sinxroni, uyqu, Rejam, siferblat.
+4. Har xatoda: konsol -> Ulashish -> matnni yuborish.
+Birinchi sinovda alohida tekshiriladiganlar: docs/ios-mapping.md, 4-bo'lim va koddagi `[?]` izohlari.
 
 
 Cheklovlar
@@ -89,20 +97,10 @@ Cheklovlar
 Mac kerak emas: iOS build EAS bulutida yig'iladi.
 Apple Developer akkaunti ($99/yil) hozir yo'q. U iPhone'ga o'rnatish (ad hoc yoki TestFlight) va App Store uchun kerak.
 iPhone hozir yo'q. Bluetooth simulyatorda ishlamaydi, soat faqat haqiqiy telefonda ulanadi.
-SDK'da simulyator qismi yo'q (0-bosqich), shuning uchun simulyator build'i ham yig'ilmaydi. Kompilyatsiya GitHub
-Actions'da imzosiz tekshiriladi.
-
-
-Tartib
-
-Akkaunt va iPhone kelguncha 1-7 bosqichlar yoziladi. Kompilyatsiya GitHub Actions'da tekshiriladi, EAS limiti
-sarflanmaydi. Haqiqiy sinov (8-bosqich) akkaunt va iPhone bo'lgach.
-Telefonsiz yozilgan kod birinchi sinovda albatta tuzatish talab qiladi, 8-bosqichga alohida vaqt ajratiladi.
+SDK'da simulyator qismi yo'q, shuning uchun simulyator build'i ham yig'ilmaydi.
 
 
 Ochiq savollar
 
 Apple Developer akkaunti va iPhone qachon bo'ladi?
-Kompilyatsiya tekshiruvi uchun GitHub Actions ishlatamizmi (repo yopiq bo'lsa macOS daqiqalari bepul limitdan
-tez sarflanadi)?
 Boshqa ochiq savollar: docs/ios-mapping.md, 4-bo'lim.

@@ -39,7 +39,7 @@ export type WatchConnection = {
   info: WatchInfo;
 };
 
-const supported = Platform.OS === "android" && watchModule !== null;
+const supported = (Platform.OS === "android" || Platform.OS === "ios") && watchModule !== null;
 
 let state: WatchConnection = {
   status: supported ? "disconnected" : "unavailable",

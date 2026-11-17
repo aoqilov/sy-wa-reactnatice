@@ -8,13 +8,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { ProfileProvider, useProfile } from "@/features/profile";
+import { installDebugCapture } from "@/shared/debug/debug-log";
 import { loadSettings, useSettingsLoaded } from "@/shared/settings/settings";
 import { useThemeColor } from "@/shared/theme/use-theme-color";
 import { AppSplash } from "@/widgets/app-splash/AppSplash";
+import { DebugConsole } from "@/widgets/debug-console/DebugConsole";
 
 // Saqlangan profil va sozlamalar (til, o'lcham, mavzu) o'qilguncha splash ekran turadi
 // (aks holda bir lahza /login yoki eski mavzu yaltirab ketardi).
 SplashScreen.preventAutoHideAsync();
+
+// Ilova ichidagi konsol (iOS sinovi va dev): xatolarni ilova ishga tushishi bilanoq yig'a boshlaydi.
+installDebugCapture();
 
 function RootNavigator() {
   const { profile, loading: profileLoading } = useProfile();
@@ -45,6 +50,7 @@ function RootNavigator() {
     <View className="flex-1">
       {navigator}
       {splash}
+      {splashVisible ? null : <DebugConsole />}
     </View>
   );
 }

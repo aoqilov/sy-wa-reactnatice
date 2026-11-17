@@ -175,10 +175,10 @@ function WatchDevPanelInner({ watch }: { watch: WatchModule }) {
 
 // Sinov va diagnostika bloki ("Soat ma'lumotlari" sahifasining pastida ochiladi).
 export function WatchDevPanel() {
-  if (Platform.OS !== "android") {
+  if (Platform.OS !== "android" && Platform.OS !== "ios") {
     return (
       <View className="items-center p-6">
-        <CusText tone="muted">Sinov paneli hozircha faqat Android uchun.</CusText>
+        <CusText tone="muted">Sinov paneli faqat telefonda ishlaydi.</CusText>
       </View>
     );
   }

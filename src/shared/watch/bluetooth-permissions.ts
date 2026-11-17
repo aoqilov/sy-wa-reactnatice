@@ -9,6 +9,8 @@ export type BluetoothPermissionResult = {
 // Android: 12+ da BLUETOOTH_SCAN/CONNECT, 11 va eskida skan uchun joylashuv. 13+ da bildirishnoma ruxsati ham
 // so'raladi, lekin u rad etilsa ham Bluetooth ishlayveradi, shuning uchun natijaga ta'sir qilmaydi.
 export async function ensureBluetoothPermissions(): Promise<BluetoothPermissionResult> {
+  // iOS: Bluetooth ruxsatini tizim birinchi skan paytida o'zi so'raydi (app.json -> NSBluetoothAlwaysUsageDescription).
+  if (Platform.OS === "ios") return { granted: true, blocked: false };
   if (Platform.OS !== "android") return { granted: false, blocked: false };
 
   const api = Platform.Version as number;

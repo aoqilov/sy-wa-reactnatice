@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { makeEcgRecord, saveEcgRecord } from "@/features/ecg";
+import { debugLog } from "@/shared/debug/debug-log";
 import { useT } from "@/shared/i18n/use-t";
 import { getWatchConnection } from "@/shared/watch/watch-connection";
 import {
@@ -147,6 +148,7 @@ export function useMeasurement(metrics: Metric[]) {
       onError: (code) => {
         cancelRef.current = null;
         setRun(null);
+        debugLog("warn", "measure", `${key}${viaWatch ? " (soatda)" : ""}: ${code}`);
         // Soat yostiqchani ilovadan boshlashga javob bermasa yoki qo'llab-quvvatlamasa: zaxira oqim: bosim soatning
         // o'zida o'lchanadi, ilova natijani soat xotirasidan o'qiydi (synapse-soat dagi kabi).
         if (key === "pressurePump" && !viaWatch && (code === "noReply" || code === "cuffUnsupported")) {

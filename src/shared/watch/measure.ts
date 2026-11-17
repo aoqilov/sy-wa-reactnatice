@@ -394,6 +394,8 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
       onEvent = (e) => {
         if (e.type !== "heart") return;
         if (e.status === "STATE_LOW_BATTERY") return fail("lowBattery");
+        // iOS: xato holati o'lchovni darhol tugatadi (paket qayta kelmaydi) — native `final: true` qo'shadi.
+        if (e.final === true) return fail(e.status === "STATE_HEART_BUSY" ? "busy" : "notWorn");
         // SDK hujjati: avval "band", keyin "taqilmagan"; o'tish paketlariga bir necha marta toqat qilamiz.
         busy = e.status === "STATE_HEART_BUSY" ? busy + 1 : 0;
         wear = e.status === "STATE_HEART_WEAR_ERROR" ? wear + 1 : 0;
@@ -428,6 +430,10 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
         const state = String(e.deviceState);
         if (state === "CHARGING") return fail("charging");
         if (state === "CHARG_LOW") return fail("lowBattery");
+        // iOS: xato holati o'lchovni darhol tugatadi (`final`).
+        if (e.final === true) {
+          return fail(state === "UNPASS_WEAR" ? "notWorn" : state === "UNSUPPORTED" ? "featureUnsupported" : "busy");
+        }
         busy = SPO2_BUSY.includes(state) ? busy + 1 : 0;
         wear = state === "UNPASS_WEAR" ? wear + 1 : 0;
         if (busy >= 3) return fail("busy");
@@ -511,6 +517,7 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
       onEvent = (e) => {
         if (e.type !== "temp") return;
         touch();
+        if (e.notWorn === true) return fail("notWorn"); // iOS: soat taqilmagan (VPTemperatureTestStateNotWear)
         const oprate = typeof e.oprate === "number" ? e.oprate : 1;
         if (oprate === 0) return fail("tempNoData");
         if (oprate === 2) return;
@@ -724,6 +731,7 @@ export function startMeasure(key: MeasureKey, handlers: MeasureHandlers): () => 
 
         // Soat zaryadda, batareya past yoki boshqa o'lchov bilan band: o'tish paketlariga bir necha marta toqat.
         const state = String(e.deviceState);
+        if (e.final === true) return finish("busy"); // iOS: band holati o'lchovni darhol tugatadi
         statusStreak = ECG_BUSY.includes(state) ? statusStreak + 1 : 0;
         if (statusStreak >= 3) {
           return finish(state === "CHARGING" ? "charging" : state === "CHARG_LOW" ? "lowBattery" : "busy");
