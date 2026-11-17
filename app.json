@@ -10,7 +10,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "uz.synapse.watch"
+      "bundleIdentifier": "uz.synapse.watch",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Ilova soatga Bluetooth orqali ulanib, o'lchovlarni va ma'lumotlarni oladi.",
+        "UIBackgroundModes": ["bluetooth-central"]
+      }
     },
     "android": {
       "package": "uz.synapse.watch",

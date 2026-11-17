@@ -19,7 +19,13 @@ SDK 2.2.113.15 o'rganildi, moslik jadvali: docs/ios-mapping.md. Asosiy topilmala
   (modules/veepoo-watch/ios/CuffBpChannel.swift). Zaxira: Health Glance (Android'da startMiniCheckup).
 
 
-1. Modul skeleti
+1. Modul skeleti — yozildi (2026-11-17), kompilyatsiya hali tekshirilmagan
+
+Fayllar: modules/veepoo-watch/ios/ (VeepooWatchModule.swift, WatchController.swift, CuffBpChannel.swift,
+VeepooWatch.podspec, Frameworks/ — 7 ta freymvork, 33 MB), expo-module.config.json ga "apple",
+app.json ga Bluetooth ruxsati va fon rejimi, .github/workflows/ios-compile.yml.
+Skeletdagi funksiyalar: isBluetoothEnabled, requestEnableBluetooth, getConnectionState, startCuffBp, stopCuffBp.
+Expo autolinking iOS modulini topadi (Windows'da tekshirildi).
 
 ios/ papkasi: VeepooWatchModule.swift (JS bilan bog'lovchi), WatchController.swift (WatchController.kt ning
 muqobili), freymvorklar ulangan .podspec (FMDB va MJExtension bog'liqliklari bilan).
