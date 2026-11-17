@@ -2,22 +2,29 @@ iOS rejasi
 
 Maqsad: iOS ham Android kabi ishlasin. iOS native qismi JS'ga Android bilan bir xil funksiya nomlarini va bir xil
 hodisalarni beradi. Shunda Home, Tarix, uyqu, qadamlar va tana tarkibi kodi o'zgarmasdan ikkala platformada ishlaydi.
-Android tomonda 59 ta native funksiya bor (VeepooWatchModule.kt). iOS papkasi (modules/veepoo-watch/ios) hali yo'q.
+Android tomonda 65 ta native funksiya bor (VeepooWatchModule.kt). iOS papkasi (modules/veepoo-watch/ios) hali yo'q.
 Umumiy qarorlar: docs/watch-integration-plan.md, 6- va 7-bosqichlar.
 
 
-0. Tayyorgarlik
+0. Tayyorgarlik — bajarildi (2026-11-17)
 
-iOS SDK'ni (HBandSDK/iOS_Ble_SDK, VeepooBleSDK.framework) yuklab olish va header fayllarini o'qish.
-Moslik jadvalini tuzish: Android'dagi 59 funksiyaning har biri uchun iOS'dagi muqobili. Har biri uchun belgi: bor,
-boshqacha ishlaydi yoki yo'q. Jadval docs/ios-mapping.md ga yoziladi.
-Freymvorkda simulyator uchun qism bormi, tekshirish (kompilyatsiyani tekshirish shunga bog'liq).
+SDK 2.2.113.15 o'rganildi, moslik jadvali: docs/ios-mapping.md. Asosiy topilmalar:
+- Freymvorklarda simulyator qismi yo'q, faqat iPhone (arm64). Kompilyatsiyani simulyator build'i bilan tekshirib
+  bo'lmaydi. Tavsiya: GitHub Actions macOS runner'da imzosiz xcodebuild (EAS limiti va Apple akkaunti kerak emas).
+- SDK "o'zi saqlaydi" rejimida (VPPeripheralManage) ishlatiladi: kunlik ma'lumot, uyqu, soatdagi tana tarkibi
+  faqat SDK bazasi orqali o'qiladi.
+- Yana 5 ta freymvork va 2 ta pod kerak (JL_BLEKit, DFUnits, JLDialUnit, ZipZap, GRDFUSDK; FMDB, MJExtension).
+- Nasosli bosimni ilovadan boshlash uchun iOS SDK'da API yo'q. Yechim yozildi: Android SDK yuboradigan kadr
+  CoreBluetooth orqali to'g'ridan-to'g'ri yoziladi, javob SDK delegate'idan o'qiladi
+  (modules/veepoo-watch/ios/CuffBpChannel.swift). Zaxira: Health Glance (Android'da startMiniCheckup).
 
 
 1. Modul skeleti
 
 ios/ papkasi: VeepooWatchModule.swift (JS bilan bog'lovchi), WatchController.swift (WatchController.kt ning
-muqobili), freymvork ulangan .podspec.
+muqobili), freymvorklar ulangan .podspec (FMDB va MJExtension bog'liqliklari bilan).
+Kompilyatsiya tekshiruvi: GitHub Actions workflow (expo prebuild, pod install, xcodebuild -sdk iphoneos
+CODE_SIGNING_ALLOWED=NO).
 expo-module.config.json ga iOS qo'shiladi.
 app.json ga Bluetooth ruxsati matni (NSBluetoothAlwaysUsageDescription).
 Buyruqlar navbati: SDK buyruqlarni parallel bajarmaydi.
@@ -76,18 +83,20 @@ Cheklovlar
 Mac kerak emas: iOS build EAS bulutida yig'iladi.
 Apple Developer akkaunti ($99/yil) hozir yo'q. U iPhone'ga o'rnatish (ad hoc yoki TestFlight) va App Store uchun kerak.
 iPhone hozir yo'q. Bluetooth simulyatorda ishlamaydi, soat faqat haqiqiy telefonda ulanadi.
-EAS iOS simulyator build'ini akkauntsiz yig'sa bo'lishi kerak (hali tekshirilmagan). U Swift kodi kompilyatsiya
-bo'lishini tekshirish uchun yetadi.
+SDK'da simulyator qismi yo'q (0-bosqich), shuning uchun simulyator build'i ham yig'ilmaydi. Kompilyatsiya GitHub
+Actions'da imzosiz tekshiriladi.
 
 
 Tartib
 
-Akkaunt va iPhone kelguncha 0-7 bosqichlar yoziladi. Kompilyatsiya 2-3 ta simulyator build bilan tekshiriladi,
-har bir build EAS limitidan sarflanadi. Haqiqiy sinov (8-bosqich) akkaunt va iPhone bo'lgach.
+Akkaunt va iPhone kelguncha 1-7 bosqichlar yoziladi. Kompilyatsiya GitHub Actions'da tekshiriladi, EAS limiti
+sarflanmaydi. Haqiqiy sinov (8-bosqich) akkaunt va iPhone bo'lgach.
 Telefonsiz yozilgan kod birinchi sinovda albatta tuzatish talab qiladi, 8-bosqichga alohida vaqt ajratiladi.
 
 
 Ochiq savollar
 
 Apple Developer akkaunti va iPhone qachon bo'ladi?
-0-bosqichni boshlash (build talab qilmaydi).
+Kompilyatsiya tekshiruvi uchun GitHub Actions ishlatamizmi (repo yopiq bo'lsa macOS daqiqalari bepul limitdan
+tez sarflanadi)?
+Boshqa ochiq savollar: docs/ios-mapping.md, 4-bo'lim.
