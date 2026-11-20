@@ -7,6 +7,10 @@ const status = (name) => ({ DEFAULT: v(name), soft: v(`${name}-soft`) });
 module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
+  // "class": tema ilova sozlamasidan qo'lda almashadi (colorScheme.set). "media" bo'lsa web'da NativeWind
+  // "Cannot manually set color scheme" xatosini beradi. Telefonda global.css dagi @media (prefers-color-scheme)
+  // baribir ilova tanlagan temaga qarab ishlaydi.
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
