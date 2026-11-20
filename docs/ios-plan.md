@@ -92,6 +92,9 @@ imzo); TestFlight va App Store uchun Apple Developer akkaunti.
 4. Har xatoda: konsol -> Ulashish -> matnni yuborish.
 Birinchi sinovda alohida tekshiriladiganlar: docs/ios-mapping.md, 4-bo'lim va koddagi `[?]` izohlari.
 
+2026-11-20 holati: ilova iPhone'da ishga tushdi. Qadamlar, uyqu va doira animatsiyasi muammolari hamda yangi
+UI'lar tekshiruvi: docs/ios-fix-plan.md (vazifalar ro'yxati bilan).
+
 
 Cheklovlar
 
