@@ -47,7 +47,7 @@ const STEP_MS = 1000;
 const SPIN_MS = 2400; // foiz hali yo'q paytda milning bir aylanishi ("kutilmoqda")
 
 // Doira ichidagi katta son (qiymat va hisoblagich). Uzun qiymat ("128/84") sig'masa, o'zi kichrayadi.
-const NUMBER_STYLE = { fontSize: 54, lineHeight: 72, width: SIZE - 40, textAlign: "center" } as const;
+const NUMBER_STYLE = { fontSize: 62, lineHeight: 78, width: SIZE - 40, textAlign: "center" } as const;
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -126,8 +126,6 @@ export function MeasureCircle({ metric, measuring, progress, display, onStart, o
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, handStyle]}>
         <View style={[styles.hand, { backgroundColor: color }]} />
       </Animated.View>
-
-      <CusText tone="muted">{metric.title}</CusText>
 
       {measuring ? (
         <>

@@ -1,24 +1,15 @@
-import Octicons from "@expo/vector-icons/Octicons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
-import { CusButton, CusScrollView, CusText } from "@/components/ui";
-import { useActivityGoals, useTodayActivity } from "@/features/activity";
-import { EcgLiveStrip } from "@/features/ecg";
-import { SleepCard, SleepHero, SleepHowSheet, useSleep } from "@/features/sleep";
-import { useT } from "@/shared/i18n/use-t";
-import { useThemeColor } from "@/shared/theme/use-theme-color";
+import { CusScrollView, CusText } from "@/components/ui";
 import { useTabBarSpace } from "@/widgets/app-tabs/AppTabs";
 
 import { Metric } from "./api/get-metrics";
-import { MeasureCircle } from "./components/measure-circle";
+import { ActivitySlider } from "./components/activity-slider";
 import { MetricSelector } from "./components/metric-selector";
-import { StepsCard } from "./components/steps-card";
-import { StepsHero } from "./components/steps-hero";
 import { useMeasurement } from "./hooks/use-measurement";
 import { useMetrics } from "./hooks/use-metrics";
-import { MetricGuideSheet } from "./modals/metric-guide-sheet";
 import { MetricInfoSheet } from "./modals/metric-info-sheet";
 
 export function FeatureHome() {
@@ -35,29 +26,16 @@ export function FeatureHome() {
   return <HomeContent metrics={metrics} />;
 }
 
-function HomeContent({
-  metrics,
-}: {
-  metrics: ReturnType<typeof useMetrics>["metrics"];
-}) {
-  const {
-    items,
-    current,
-    selectedKey,
-    select,
-    measuring,
-    progress,
-    display,
-    hint,
-    error,
-    start,
-    cancel,
-  } = useMeasurement(metrics);
-  const t = useT();
-  const primary = useThemeColor("primary", "#1E6FEB");
+/** O'lchov kartasi bosilganda: o'z sahifasi (/measure/[metric]) — doira va bugungi natijalar. */
+const openMeasure = (metric: string) =>
+  router.push({ pathname: "/measure/[metric]", params: { metric } });
+
+// Bosh sahifa: tepada Qadamlar va Uyqu slayderi, ostida o'lchov kartalari to'ri. O'lchash har kartaning o'z sahifasida.
+function HomeContent({ metrics }: { metrics: Metric[] }) {
+  // Faqat kartalardagi oxirgi natijalar uchun (o'lchash bu yerda boshlanmaydi). O'lchov sahifasida saqlangan natija
+  // `subscribeReadings` orqali shu yerga ham keladi.
+  const { items } = useMeasurement(metrics);
   const tabBarSpace = useTabBarSpace();
-  const [guideOpen, setGuideOpen] = useState(false); // "Qanday o'lchanadi?" sheet'i
-  const [sleepHowOpen, setSleepHowOpen] = useState(false); // uyqu halqasida: "Soat uyquni qanday hisoblaydi?"
 
   // Info sheet: qaysi o'lchov haqida ekani va ochiq-yopiqligi alohida saqlanadi,
   // shunda yopilish animatsiyasi paytida sheet mazmuni o'zgarib ketmaydi.
@@ -65,188 +43,34 @@ function HomeContent({
   const [infoOpen, setInfoOpen] = useState(false);
   const infoMetric = items.find((m) => m.key === infoKey) ?? items[0];
 
-  // "Qadamlar" yoki "Uyqu" kartasi tanlangan: tepada o'lchash doirasi o'rnida katta halqa. O'lchov kartasi bosilsa
-  // qaytadi. Ma'lumot bir marta o'qiladi va karta bilan halqaga beriladi. O'lchov ketayotganda doim o'lchash doirasi.
-  const [view, setView] = useState<"metric" | "steps" | "sleep">("metric");
-  const activity = useTodayActivity();
-  const { goals, save: saveGoals } = useActivityGoals();
-  const sleep = useSleep();
-  const showSteps = view === "steps" && activity.available && !measuring;
-  const showSleep = view === "sleep" && sleep.available && !measuring;
-  const showHero = showSteps || showSleep;
-  const leadingCount = (activity.available ? 1 : 0) + (sleep.available ? 1 : 0);
-
-  const selectMetric = (key: Metric["key"]) => {
-    setView("metric");
-    select(key);
-  };
-
   return (
     <View className="flex-1 bg-background">
-      {/* Tepa qism qimirlamaydi: scroll paytida doira yopilib qolmaydi */}
-      <View className="items-center gap-5 pb-5 pt-6">
-        {/* "Qanday o'lchanadi?" — chap yuqori burchakda: o'lchov uchun ko'rsatma, uyqu halqasida — uyqu qanday hisoblanadi */}
-        {!showSteps ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={showSleep ? t("sleep.how.title") : "Qanday o'lchanadi?"}
-            onPress={() => (showSleep ? setSleepHowOpen(true) : setGuideOpen(true))}
-            hitSlop={8}
-            className="absolute left-4 top-3 z-10 h-11 w-11 items-center justify-center rounded-full border border-border bg-surface"
-          >
-            <Octicons name="question" size={22} color={primary} />
-          </Pressable>
-        ) : null}
+      <CusScrollView className="flex-1" contentContainerStyle={{ paddingBottom: tabBarSpace }}>
+        <View className="px-4 pb-3 pt-5">
+          <CusText variant="title">Sog&apos;lig&apos;im</CusText>
+        </View>
 
-        {/* 1. O'lchash yoki (Qadamlar tanlangan bo'lsa) katta qadam halqasi */}
-        {showSteps ? (
-          <StepsHero
-            today={activity.today}
-            goals={goals}
-            ready={activity.ready}
-            onSaveGoals={(g) => void saveGoals(g)}
-            onDetails={() => router.push("/history/steps", { withAnchor: true })}
-          />
-        ) : showSleep ? (
-          <SleepHero
-            night={sleep.nights?.[0] ?? null}
-            goalMin={goals.sleepMin}
-            ready={sleep.ready}
-            syncing={sleep.syncing}
-            onDetails={() => router.push("/history/sleep", { withAnchor: true })}
-          />
-        ) : (
-          <MeasureCircle
-            metric={current}
-            measuring={measuring}
-            progress={progress}
-            display={display}
-            onStart={start}
-            onCancel={cancel}
-          />
-        )}
+        <ActivitySlider />
 
-        {/* EKG: o'lchash paytida jonli to'lqin; boshqa paytda saqlangan yozuvlar History sahifasida (hisoboti bilan) */}
-        {current.key === "ecg" && measuring ? <EcgLiveStrip /> : null}
-        {current.key === "ecg" && !measuring && !showHero ? (
-          <CusButton
-            title={t("ecg.records")}
-            variant="ghost"
-            size="sm"
-            onPress={() =>
-              router.push({ pathname: "/history/[metric]", params: { metric: "ecg" } }, { withAnchor: true })
-            }
-          />
-        ) : null}
-        {/* Tana tarkibi va qon tahlili: yozuvlar EKG kabi Tarix'da (ro'yxat → natija sahifasi) */}
-        {current.key === "bodyComp" && !measuring && !showHero ? (
-          <CusButton
-            title={t("home.records.body")}
-            variant="ghost"
-            size="sm"
-            onPress={() => router.push("/history/body", { withAnchor: true })}
-          />
-        ) : null}
-        {current.key === "blood" && !measuring && !showHero ? (
-          <CusButton
-            title={t("home.records.blood")}
-            variant="ghost"
-            size="sm"
-            onPress={() =>
-              router.push({ pathname: "/history/[metric]", params: { metric: "blood" } }, { withAnchor: true })
-            }
-          />
-        ) : null}
-
-        {/* O'lchash davomida soat ogohlantirsa (qo'l yurak balandligida emas, qimirladi): xato emas, o'lchov davom etadi */}
-        {measuring && hint ? (
-          <CusText
-            variant="caption"
-            tone="warning"
-            className="px-6 text-center"
-          >
-            {hint}
-          </CusText>
-        ) : null}
-
-        {/* Soat o'lchovni yakunlay olmasa (taqilmagan, band, aloqa uzilgan ...) sababi shu yerda */}
-        {error && !showHero ? (
-          <CusText variant="caption" tone="danger" className="px-6 text-center">
-            {error}
-          </CusText>
-        ) : null}
-
-      </View>
-
-      {/* 3. O'lchovlar paneli: sarlavha qotib turadi, faqat kartalar scroll bo'ladi (kerak bo'lsagina).
-          Pastda suzuvchi tab bar balandligicha joy. */}
-      <View
-        className="flex-1 border-t border-border bg-surface"
-        style={{ borderTopStartRadius: 12, borderTopEndRadius: 12 }}
-      >
-        <View className="gap-1 px-4 pb-2 pt-4">
-          <CusText variant="heading">O&apos;lchovni tanlang</CusText>
+        <View className="gap-1 px-4 pb-1 pt-5">
+          <CusText variant="heading">O&apos;lchovlar</CusText>
           <CusText variant="caption" tone="muted">
-            Kerakli ko&apos;rsatkichni tanlab, yuqoridagi &quot;Boshlash&quot; tugmasini bosing.
+            Kartani bosing: o&apos;lchash va bugungi natijalar
           </CusText>
         </View>
 
-        <CusScrollView className="flex-1" contentContainerStyle={{ paddingBottom: tabBarSpace }}>
-          <MetricSelector
-            metrics={items}
-            selectedKey={showHero ? null : selectedKey}
-            onSelect={selectMetric}
-            leadingCount={leadingCount}
-            leading={
-              leadingCount > 0
-                ? (width) => (
-                    <>
-                      {activity.available ? (
-                        <StepsCard
-                          today={activity.today}
-                          goals={goals}
-                          width={width}
-                          active={showSteps}
-                          disabled={measuring}
-                          onSelect={() => setView("steps")}
-                        />
-                      ) : null}
-                      {/* Uyqu: oxirgi kecha; bosilsa tepada uyqu halqasi, undan "Batafsil" → uyqu sahifasi */}
-                      {sleep.available ? (
-                        <SleepCard
-                          night={sleep.nights?.[0] ?? null}
-                          goalMin={goals.sleepMin}
-                          width={width}
-                          active={showSleep}
-                          disabled={measuring}
-                          onSelect={() => setView("sleep")}
-                        />
-                      ) : null}
-                    </>
-                  )
-                : undefined
-            }
-            onInfo={(key) => {
-              setInfoKey(key);
-              setInfoOpen(true);
-            }}
-          />
-        </CusScrollView>
-      </View>
+        <MetricSelector
+          metrics={items}
+          selectedKey={null}
+          onSelect={openMeasure}
+          onInfo={(key) => {
+            setInfoKey(key);
+            setInfoOpen(true);
+          }}
+        />
+      </CusScrollView>
 
-      <MetricInfoSheet
-        metric={infoMetric}
-        visible={infoOpen}
-        onClose={() => setInfoOpen(false)}
-      />
-
-      <MetricGuideSheet
-        metric={current}
-        visible={guideOpen}
-        onClose={() => setGuideOpen(false)}
-      />
-
-      <SleepHowSheet visible={sleepHowOpen} onClose={() => setSleepHowOpen(false)} />
+      <MetricInfoSheet metric={infoMetric} visible={infoOpen} onClose={() => setInfoOpen(false)} />
     </View>
   );
 }

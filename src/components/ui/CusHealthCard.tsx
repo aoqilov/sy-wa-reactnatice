@@ -66,7 +66,7 @@ export function CusHealthCard({
       className="overflow-hidden bg-background"
     >
       {/* Fon: chap yuqoridan o'ng pastga o'z rangining och tusi. Tanlanganda biroz to'qroq. */}
-      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
         <Defs>
           <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
             <Stop offset="0" stopColor={color} stopOpacity={active ? 0.26 : 0.16} />

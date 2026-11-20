@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
 
 import { CusHealthCard, CusHealthValue, CusText } from "@/components/ui";
@@ -15,10 +14,6 @@ type Props = {
   selectedKey: Metric["key"] | null;
   onSelect: (key: Metric["key"]) => void;
   onInfo: (key: Metric["key"]) => void; // kartadagi "info" belgisi bosilganda
-  /** To'r boshidagi qo'shimcha karta (o'lchov emas, masalan "Qadamlar"); kenglik oddiy karta kengligi. */
-  leading?: (width: number) => ReactNode;
-  /** `leading` nechta karta chizadi (toq/juft hisobi uchun). */
-  leadingCount?: number;
 };
 
 const PADDING = 16; // chap va o'ng chetdan
@@ -26,7 +21,6 @@ const GAP = 8; // kartalar orasidagi masofa
 const COLS = 2; // 2 ustun, kartalar pastga qarab tushadi (surish yo'q)
 const SPARK_POINTS = 8; // mini grafikda nechta oxirgi o'lchov
 const SPARK_WIDTH = 56;
-const SPARK_WIDTH_WIDE = 120;
 
 // Holat matni (Normal / Past / Yuqori) rangi.
 const STATUS_TONE: Record<MetricStatus, "success" | "warning" | "danger"> = {
@@ -45,34 +39,27 @@ function sparkValues(m: Metric): number[] {
     .reverse();
 }
 
-// O'lchov kartalari: 2 ustunli to'r, ustunlar to'lsa keyingi qatorga tushadi. Toq sondagi oxirgi karta butun qatorni
-// egallaydi. Karta o'z o'lchovining rangidagi gradient fonda (constants/metric-colors.ts); holat matni esa holat
-// rangida (yashil/sariq/qizil).
-export function MetricSelector({ metrics, selectedKey, onSelect, onInfo, leading, leadingCount = 1 }: Props) {
+// O'lchov kartalari: 2 ustunli to'r, ustunlar to'lsa keyingi qatorga tushadi. Hamma kartalar bir xil kenglikda (toq
+// sondagi oxirgisi ham cho'zilmaydi). Karta o'z o'lchovining rangidagi gradient fonda (constants/metric-colors.ts);
+// holat matni esa holat rangida (yashil/sariq/qizil).
+export function MetricSelector({ metrics, selectedKey, onSelect, onInfo }: Props) {
   const { width } = useWindowDimensions();
 
   const itemWidth = (width - PADDING * 2 - GAP * (COLS - 1)) / COLS;
-  const wideWidth = itemWidth * COLS + GAP * (COLS - 1);
-  const total = metrics.length + (leading ? leadingCount : 0); // to'rdagi jami kartalar (toq bo'lsa oxirgisi keng)
 
   return (
-    // Sarlavha ("O'lchovni tanlang") va panel foni FeatureHome'da: ular qotib turadi, faqat shu kartalar scroll bo'ladi.
     <View className="flex-row flex-wrap pb-4 pt-2" style={{ paddingHorizontal: PADDING, gap: GAP }}>
-      {leading ? leading(itemWidth) : null}
-      {metrics.map((m, i) => {
-        const wide = total % COLS === 1 && i === metrics.length - 1;
-        return (
-          <MetricCardItem
-            key={m.key}
-            metric={m}
-            width={wide ? wideWidth : itemWidth}
-            sparkWidth={wide ? SPARK_WIDTH_WIDE : SPARK_WIDTH}
-            active={m.key === selectedKey}
-            onSelect={() => onSelect(m.key)}
-            onInfo={() => onInfo(m.key)}
-          />
-        );
-      })}
+      {metrics.map((m) => (
+        <MetricCardItem
+          key={m.key}
+          metric={m}
+          width={itemWidth}
+          sparkWidth={SPARK_WIDTH}
+          active={m.key === selectedKey}
+          onSelect={() => onSelect(m.key)}
+          onInfo={() => onInfo(m.key)}
+        />
+      ))}
     </View>
   );
 }

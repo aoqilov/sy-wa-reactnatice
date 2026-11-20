@@ -49,6 +49,11 @@ export function subscribeReadings(listener: () => void): () => void {
 
 export async function appendReading(next: StoredReading): Promise<void> {
   await saveReadings(prependReading(await loadReadings(), next));
+  notifyReadings();
+}
+
+/** Xotiradagi ro'yxat o'zgardi: ochiq ekranlar (Home kartalari, o'lchov sahifasi) qayta o'qiydi. */
+export function notifyReadings() {
   listeners.forEach((l) => l());
 }
 

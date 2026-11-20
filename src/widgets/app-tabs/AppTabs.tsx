@@ -13,7 +13,7 @@ type IconName = ComponentProps<typeof Octicons>["name"];
 
 // Yangi tab qo'shish: shu ro'yxatga qator qo'shing (sarlavha — tarjima kaliti) va src/app/ ichida shu nomli route yarating.
 const TABS: { name: string; title: TranslationKey; icon: IconName }[] = [
-  { name: "index", title: "tabs.home", icon: "home" },
+  { name: "(home)", title: "tabs.home", icon: "home" },
   { name: "history", title: "tabs.history", icon: "history" },
   { name: "myplan", title: "tabs.myplan", icon: "checklist" },
   { name: "profile", title: "tabs.profile", icon: "person" },

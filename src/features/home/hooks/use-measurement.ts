@@ -18,6 +18,7 @@ import { Metric } from "../api/get-metrics";
 import {
   applyReadings,
   loadReadings,
+  notifyReadings,
   prependReading,
   saveReadings,
   type StoredReading,
@@ -81,9 +82,9 @@ function liveDisplay(
 
 // Tanlangan o'lchov va soatda haqiqiy o'lchash jarayonini boshqaradi: "Boshlash" bosilganda soatga so'rov
 // yuboriladi (shared/watch/measure.ts), natija saqlanadi va kartalarga qo'shiladi.
-export function useMeasurement(metrics: Metric[]) {
+export function useMeasurement(metrics: Metric[], initialKey: MetricKey = "pulse") {
   const t = useT();
-  const [selectedKey, setSelectedKey] = useState<MetricKey>("pulse");
+  const [selectedKey, setSelectedKey] = useState<MetricKey>(initialKey);
   const [run, setRun] = useState<Run | null>(null); // null = o'lchanmayapti
   const [error, setError] = useState<string | null>(null);
   const [readings, setReadings] = useState<StoredReading[]>([]);
@@ -133,7 +134,8 @@ export function useMeasurement(metrics: Metric[]) {
         const next = prependReading(readingsRef.current, toStoredReading(raw));
         readingsRef.current = next;
         setReadings(next);
-        saveReadings(next).catch(() => {}); // saqlanmasa ham natija ekranda qoladi
+        // Saqlangach boshqa ochiq ekranlar (Home kartalari) yangilanadi; saqlanmasa ham natija ekranda qoladi.
+        saveReadings(next).then(notifyReadings, () => {});
         // EKG: to'lqin bilan to'liq yozuv saqlanadi; hisoboti History sahifasida (EKG kartasi) ochiladi.
         if (raw.key === "ecg") {
           const watch = getWatchConnection();
@@ -168,6 +170,8 @@ export function useMeasurement(metrics: Metric[]) {
 
   return {
     items,
+    /** Hamma saqlangan natijalar (yangidan eskiga): o'lchov sahifasidagi bugungi ro'yxat uchun. */
+    readings,
     current,
     selectedKey,
     select: (key: MetricKey) => {
