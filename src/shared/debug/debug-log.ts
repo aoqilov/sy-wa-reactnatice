@@ -40,7 +40,20 @@ export function debugLog(level: DebugLevel, source: string, ...parts: unknown[])
   if (!DEBUG_CONSOLE_ENABLED) return;
   const message = parts.map(stringify).join(" ");
   entries = [{ id: nextId++, at: Date.now(), level, source, message }, ...entries].slice(0, MAX_ENTRIES);
-  notify();
+  scheduleNotify();
+}
+
+// Yozuv boshqa komponent render bo'layotganda kelishi mumkin (React console.warn/error'ni render ichida chaqiradi):
+// konsolni o'sha zahoti yangilash "Cannot update a component while rendering a different component" xatosini beradi.
+// Shuning uchun xabar render tugagach, bir marta yuboriladi (ketma-ket yozuvlar bitta yangilanishga yig'iladi).
+let notifyScheduled = false;
+function scheduleNotify() {
+  if (notifyScheduled) return;
+  notifyScheduled = true;
+  setTimeout(() => {
+    notifyScheduled = false;
+    notify();
+  }, 0);
 }
 
 export function clearDebugLog() {

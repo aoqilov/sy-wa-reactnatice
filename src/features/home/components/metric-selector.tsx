@@ -1,12 +1,12 @@
-import Octicons from "@expo/vector-icons/Octicons";
 import type { ReactNode } from "react";
-import { Pressable, useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 
-import { CusText } from "@/components/ui";
-import { useThemeColor } from "@/shared/theme/use-theme-color";
+import { CusHealthCard, CusHealthValue, CusText } from "@/components/ui";
 
 import { EMPTY_VALUE, Metric, type MetricStatus } from "../api/get-metrics";
-import { METRIC_COLORS, withAlpha } from "../constants/metric-colors";
+import { METRIC_RANGES, METRIC_TAGLINES } from "../constants/metric-card";
+import { METRIC_COLORS } from "../constants/metric-colors";
+import { RangeBar } from "./range-bar";
 import { Sparkline } from "./sparkline";
 
 type Props = {
@@ -28,13 +28,11 @@ const SPARK_POINTS = 8; // mini grafikda nechta oxirgi o'lchov
 const SPARK_WIDTH = 56;
 const SPARK_WIDTH_WIDE = 120;
 
-// Holat yorlig'i (Normal / Past / Yuqori) ranglari: fon sinfi (to'liq nom: Tailwind uni statik ko'rishi kerak) va matn rangi
-// (`CusText` tone orqali: o'z standart rangi bilan sinf to'qnashuvi bo'lmasin).
-const CHIP: Record<MetricStatus | "none", { box: string; tone: "success" | "warning" | "danger" | "muted" }> = {
-  normal: { box: "bg-success-soft", tone: "success" },
-  warning: { box: "bg-warning-soft", tone: "warning" },
-  danger: { box: "bg-danger-soft", tone: "danger" },
-  none: { box: "bg-neutral-soft", tone: "muted" },
+// Holat matni (Normal / Past / Yuqori) rangi.
+const STATUS_TONE: Record<MetricStatus, "success" | "warning" | "danger"> = {
+  normal: "success",
+  warning: "warning",
+  danger: "danger",
 };
 
 /** Oxirgi o'lchovlar, eskidan yangiga. Bosimda yuqori (sistolik) qiymat olinadi. Qon tahlili bitta son emas: grafik yo'q. */
@@ -48,8 +46,8 @@ function sparkValues(m: Metric): number[] {
 }
 
 // O'lchov kartalari: 2 ustunli to'r, ustunlar to'lsa keyingi qatorga tushadi. Toq sondagi oxirgi karta butun qatorni
-// egallaydi. Har bir kartada: nom, qiymat, rangli holat yorlig'i, mini grafik va oxirgi o'lchov vaqti. Karta o'z
-// o'lchovining rangida (constants/metric-colors.ts); holat yorlig'i esa holat rangida (yashil/sariq/qizil).
+// egallaydi. Karta o'z o'lchovining rangidagi gradient fonda (constants/metric-colors.ts); holat matni esa holat
+// rangida (yashil/sariq/qizil).
 export function MetricSelector({ metrics, selectedKey, onSelect, onInfo, leading, leadingCount = 1 }: Props) {
   const { width } = useWindowDimensions();
 
@@ -88,70 +86,51 @@ type CardProps = {
   onInfo: () => void;
 };
 
+// O'lchanmagan: sarlavha, qisqa chorlov matni va pastki burchakda katta belgi. O'lchangan: "103 zarb/daq", rangli
+// me'yor chizig'i (marker qiymat joyida) yoki mini grafik, pastda vaqt va holat ("11:29 · Normal").
 function MetricCardItem({ metric: m, width, sparkWidth, active, onSelect, onInfo }: CardProps) {
-  const border = useThemeColor("border", "#E5E8EE");
-  const muted = useThemeColor("muted", "#6B7385");
-  const color = METRIC_COLORS[m.key]; // shu o'lchovning rangi: belgi, tanlangan chegara va grafik
-
+  const color = METRIC_COLORS[m.key]; // shu o'lchovning rangi: fon, belgi, tanlangan chegara va grafik
   const measured = m.value !== EMPTY_VALUE;
-  const chip = CHIP[measured ? m.status : "none"];
-  // Yorliq matni: "Normal · soat: past xavf · taxminiy" kabi uzun qatordan faqat holat ("Normal").
-  const chipLabel = measured ? m.statusLabel.split(" · ")[0] : m.updatedAt;
+  const range = METRIC_RANGES[m.key];
+  const number = Number(m.value.split("/")[0]); // bosimda yuqori (sistolik) qiymat
+  // Holat matni: "Normal · soat: past xavf · taxminiy" kabi uzun qatordan faqat holat ("Normal").
+  const statusLabel = m.statusLabel.split(" · ")[0];
 
   return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
+    <CusHealthCard
+      width={width}
+      color={color}
+      icon={m.icon}
+      title={m.title}
+      active={active}
       onPress={onSelect}
-      // Tanlangan karta: o'lchov rangidagi chegara va shu rangning yengil tusi. Chegara qalinligi doim bir xil (2),
-      // shunda tanlanganda ichi siljimaydi.
-      style={{
-        width,
-        borderWidth: 2,
-        borderColor: active ? color : border,
-        backgroundColor: active ? withAlpha(color, 0.12) : undefined,
-      }}
-      className={`gap-2 rounded-xl px-3 py-3 ${active ? "" : "bg-background"}`}
+      onInfo={onInfo}
+      illustrated={!measured}
     >
-      <View className="flex-row items-center gap-2">
-        <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: withAlpha(color, 0.18) }}>
-          <Octicons name={m.icon} size={16} color={color} />
-        </View>
-        <CusText variant="caption" className="flex-1 font-semibold" numberOfLines={1}>
-          {m.title}
+      {measured ? (
+        <>
+          <CusHealthValue value={m.value} unit={m.unit} />
+          <View className="flex-1 justify-center">
+            {range && Number.isFinite(number) ? (
+              <RangeBar range={range} value={number} />
+            ) : (
+              <Sparkline values={sparkValues(m)} color={color} width={sparkWidth} />
+            )}
+          </View>
+          <View className="flex-row items-center justify-between gap-2">
+            <CusText variant="caption" tone="muted" numberOfLines={1} className="shrink">
+              {m.updatedAt}
+            </CusText>
+            <CusText variant="caption" tone={STATUS_TONE[m.status]} className="font-semibold" numberOfLines={1}>
+              {statusLabel}
+            </CusText>
+          </View>
+        </>
+      ) : (
+        <CusText variant="caption" tone="muted" numberOfLines={3} style={{ paddingRight: 24 }}>
+          {METRIC_TAGLINES[m.key]}
         </CusText>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${m.title} haqida ma'lumot`}
-          onPress={onInfo}
-          hitSlop={10}
-        >
-          <Octicons name="info" size={16} color={muted} />
-        </Pressable>
-      </View>
-
-      <View>
-        <CusText className="text-2xl font-bold" tone={measured ? "default" : "muted"} numberOfLines={1} adjustsFontSizeToFit>
-          {m.value}
-        </CusText>
-        <CusText variant="caption" tone="muted" numberOfLines={1}>
-          {m.unit}
-        </CusText>
-      </View>
-
-      <View className="flex-row items-center justify-between gap-2" style={{ minHeight: 22 }}>
-        <View className={`shrink rounded-full px-2 py-0.5 ${chip.box}`}>
-          <CusText variant="caption" tone={chip.tone} className="font-semibold" numberOfLines={1}>
-            {chipLabel}
-          </CusText>
-        </View>
-        {measured ? <Sparkline values={sparkValues(m)} color={color} width={sparkWidth} /> : null}
-      </View>
-
-      {/* O'lchanmagan kartada ham bir xil balandlik: bo'sh joy ushlab turiladi */}
-      <CusText variant="caption" tone="muted" numberOfLines={1}>
-        {measured ? m.updatedAt : " "}
-      </CusText>
-    </Pressable>
+      )}
+    </CusHealthCard>
   );
 }

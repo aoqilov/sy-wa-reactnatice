@@ -8,6 +8,7 @@ export { CusCheckbox } from "./CusCheckbox";
 export { CusChip } from "./CusChip";
 export { CusDivider } from "./CusDivider";
 export { CusEmptyState } from "./CusEmptyState";
+export { CusHealthCard, CusHealthValue } from "./CusHealthCard";
 export { CusImage } from "./CusImage";
 export { CusInput } from "./CusInput";
 export { CusKeyboardScrollView, useScrollToFocusedInput } from "./CusKeyboardScrollView";

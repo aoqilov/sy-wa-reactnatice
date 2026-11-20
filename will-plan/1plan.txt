@@ -1,0 +1,4 @@
+1. agar soat zaryadi 25% kam bolsa bosim olchash ishlamaydi shuni user uchun chunarli qilib yozob qoyish kere
+2.iconkalarni alshitirish
+3. ios telefon qabul qilishini qoshish
+4.soat qidirish page hamma soatdan uzilishg buttoni ham bolsin

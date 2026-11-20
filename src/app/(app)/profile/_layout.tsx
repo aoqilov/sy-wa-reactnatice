@@ -9,7 +9,8 @@ export default function ProfileLayout() {
     >
       <Stack.Screen name="index" options={{ title: "Profile" }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
-      <Stack.Screen name="preview" options={{ title: "UI preview" }} />      <Stack.Screen
+      <Stack.Screen name="preview" options={{ title: "UI preview" }} />
+      <Stack.Screen
         name="edit"
         options={{
           presentation: "formSheet",
